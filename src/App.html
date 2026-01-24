@@ -87,17 +87,16 @@
                     <select v-model="selectedKlasse" class="form-select form-select-sm w-auto border-0 shadow-sm" @change="handleKlassenWechsel">
                         <option v-for="k in klassenListe" :key="k.id" :value="k">{{ k.kuerzel }}</option>
                     </select>
-                  <div class="ms-auto d-flex gap-2">
+                    <div class="ms-auto d-flex gap-2">
                         <button v-if="zuordnungen.length > 0" @click="resetMatches" class="btn btn-outline-light btn-sm fw-bold px-3 rounded-pill">
                             Matches-Löschen
                         </button>
-                        
                         <button @click="autoMatch" 
                                 class="btn btn-light btn-sm fw-bold text-primary shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
                                 title="Sucht im Bilder-Pool nach Übereinstimmungen mit Name + Vorname oder der Schüler-ID.">
                             <i class="bi bi-magic"></i> Auto-Match
                         </button>
-                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0 overflow-auto" style="max-height: 65vh;">
                     <table class="table table-hover align-middle mb-0">
@@ -107,6 +106,7 @@
                                 <th class="text-center" style="width: 70px;">SVWS</th>
                                 <th class="text-center" style="width: 80px;">ID</th>
                                 <th>Name, Vorname</th>
+                                <th class="text-center" style="width: 80px;">Live</th>
                                 <th class="text-end pe-3" style="width: 80px;">Foto</th>
                             </tr>
                         </thead>
@@ -127,6 +127,13 @@
                                     <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="font-size: 0.75rem;">{{ s.id }}</span>
                                 </td>
                                 <td class="fw-medium">{{ s.nachname }}, {{ s.vorname }}</td>
+                                <td class="text-center">
+                                    <button @click.stop="startCamera(s)" 
+                                            class="btn btn-outline-secondary btn-sm border-0 rounded-circle" 
+                                            title="Live-Kamera öffnen">
+                                        <i class="bi bi-camera-video"></i>
+                                    </button>
+                                </td>
                                 <td class="text-end pe-3">
                                     <button v-if="s.hatFoto" 
                                             class="btn btn-link btn-sm text-danger p-0" 
@@ -134,7 +141,7 @@
                                             @click.stop="confirmDelete(s)">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    </td>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -216,4 +223,32 @@
             <div class="text-muted small">Bild {{ uploadStatus.current }} von {{ uploadStatus.total }}</div>
         </div>
     </div>
+
+   <div v-if="camera && camera.active" class="modal-backdrop glass-backdrop"></div>
+
+    <div v-if="camera && camera.active" class="modal show d-block">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h6 class="modal-title">
+                        Foto aufnehmen: {{ camera?.schueler?.vorname }} {{ camera?.schueler?.nachname }}
+                    </h6>
+                    <button @click="stopCamera" class="btn-close btn-close-white shadow-none"></button>
+                </div>
+                <div class="modal-body p-0 position-relative bg-black d-flex justify-content-center">
+                    <video ref="videoPlayer" autoplay playsinline class="w-100" style="max-height: 70vh;"></video>
+                    <div class="camera-overlay-frame"></div>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <button @click="capturePhoto" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
+                        <i class="bi bi-camera-fill me-2"></i> Foto schießen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <canvas ref="captureCanvas" style="display:none;"></canvas>
+
 </div>
