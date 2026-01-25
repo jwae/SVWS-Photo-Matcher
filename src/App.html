@@ -88,11 +88,19 @@
                         <option v-for="k in klassenListe" :key="k.id" :value="k">{{ k.kuerzel }}</option>
                     </select>
                     <div class="ms-auto d-flex gap-2">
-                        <button v-if="zuordnungen.length > 0" @click="resetMatches" class="btn btn-outline-light btn-sm fw-bold px-3 rounded-pill">
-                            Matches-Löschen
+                        
+                        
+                        <button @click="resetMatches" 
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="zuordnungen.length === 0"
+                                title="Alle aktuellen Zuordnungen aufheben">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Matches löschen</span>
                         </button>
+
+
                         <button @click="autoMatch" 
-                                class="btn btn-light btn-sm fw-bold text-primary shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
                                 title="Sucht im Bilder-Pool nach Übereinstimmungen mit Name + Vorname oder der Schüler-ID.">
                             <i class="bi bi-magic"></i> Auto-Match
                         </button>
@@ -107,7 +115,7 @@
                                 <th class="text-center" style="width: 80px;">ID</th>
                                 <th>Name, Vorname</th>
                                 <th class="text-center" style="width: 80px;">Live</th>
-                                <th class="text-end pe-3" style="width: 80px;">Foto</th>
+                                <th class="text-center" style="width: 80px;">Foto</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -128,7 +136,7 @@
                                     <i v-if="s.hatFoto" 
                                     class="bi bi-person-square text-primary fs-4 cursor-pointer" 
                                     @click.stop="fetchAndShowDBFoto(s)"
-                                    title="Foto in SVWS vorhanden"></i>
+                                    title="Foto in Schild vorhanden"></i>
                                     <i v-else 
                                     class="bi bi-person-square text-muted opacity-25 fs-4"></i>
                                 </td>
@@ -143,10 +151,11 @@
                                         <i class="bi bi-camera fs-5"></i>
                                     </button>
                                 </td>
-                                <td class="text-end pe-3">
+                                <td class="text-center">
                                     
                                     <button v-if="s.hatFoto" 
                                             class="btn btn-link btn-sm text-danger p-0" 
+                                            title="Foto in Schild löschen"
                                             @click.stop="confirmDelete(s)">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -164,18 +173,25 @@
             <div class="card shadow-sm border-0 h-100 rounded-4 overflow-hidden">
 
                 <div class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold">Bilder-Pool</h5>
+                    <h5 class="mb-0 d-flex align-items-center gap-2">                        
+                        Bilder-Pool
+                        <span v-if="anzahlBilderImPool > 0" class="badge rounded-pill bg-white text-dark shadow-sm" style="font-size: 0.8rem;">
+                            {{ anzahlBilderImPool }}
+                        </span>
+                        </h5>
                     
                     <div class="d-flex gap-2">
                         <button @click="downloadAllLiveImages" 
-                                class="btn btn-light btn-sm fw-bold text-primary shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="!Object.values(gefundeneBilder).some(b => b.isLive)"
                                 title="Alle Live-Bilder speichern">
                             <i class="bi bi-cloud-download"></i>
                             <span>Live-JPGs exportieren</span>
                         </button>
                         
                         <button @click="zeigeLeerenModal" 
-                                class="btn btn-light btn-sm fw-bold text-danger shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="Object.keys(gefundeneBilder).length === 0"
                                 title="Pool komplett leeren">
                             <i class="bi bi-trash3"></i>
                             <span>Bilder-Pool leeren</span>
@@ -334,7 +350,7 @@
 </p>
 
             <div class="d-flex gap-2">
-                <button class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">Abbrechen</button>
+                <button class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">Nein</button>
                 <button class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm" @click="executeDelete">Löschen</button>
             </div>
         </div>

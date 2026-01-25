@@ -38,6 +38,10 @@ const sortierteSchueler = computed(() => {
   return [...selectedKlasse.value.schueler].sort((a,b) => a.nachname.localeCompare(b.nachname));
 });
 
+const anzahlBilderImPool = computed(() => {
+  return Object.keys(gefundeneBilder.value).length;
+});
+
 // --- 3. API & AUTH ---
 async function ladeSchemata() {
   isLoadingSchemata.value = true;
@@ -323,7 +327,6 @@ function stopCamera() {
 }
 
 // --- 7. KAMERA-LOGIK ---
-// --- 7. KAMERA-LOGIK ---
 
 async function capturePhoto() {
   if (!videoPlayer.value || !captureCanvas.value || !camera.schueler) return;
@@ -333,31 +336,23 @@ async function capturePhoto() {
   const context = canvas.getContext('2d');
   const s = camera.schueler;
 
-// --- KLASSEN-RETTUNG ---
-  // 1. Wir prüfen, ob im Filter eine Klasse gewählt wurde.
-  // 2. Falls ja, nehmen wir deren Bezeichnung.
-  // 3. Falls nein oder falls die Bezeichnung fehlt, nehmen wir '00'.
+  // --- KLASSEN-RETTUNG ---
   let klassenName = '00';
-  
- if (selectedKlasse.value && selectedKlasse.value.kuerzel) {
-    // Wir nehmen 'kuerzel', weil das in deinem HTML steht!
+  if (selectedKlasse.value && selectedKlasse.value.kuerzel) {
     klassenName = selectedKlasse.value.kuerzel.replace(/\s+/g, '_');
-  } 
+  }
 
-
-  // 1. DREIFACHE AUFLÖSUNG: 119x3 = 357, 160x3 = 480
+  // --- AUFLÖSUNG & SCHNITT ---
   const factor = 3;
   canvas.width = 119 * factor;
   canvas.height = 160 * factor;
 
-  // Ausschnitt berechnen (Zentrieren)
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const sourceAspect = sourceWidth / sourceHeight;
   const targetAspect = 119 / 160;
 
   let drawWidth, drawHeight, offsetX, offsetY;
-
   if (sourceAspect > targetAspect) {
     drawWidth = sourceHeight * targetAspect;
     drawHeight = sourceHeight;
@@ -370,7 +365,7 @@ async function capturePhoto() {
     offsetY = (sourceHeight - drawHeight) / 2;
   }
 
-  // Bild in hoher Auflösung zeichnen
+  // Bild zeichnen
   context.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
   
   const imageData = canvas.toDataURL('image/jpeg', 0.9);
@@ -382,16 +377,31 @@ async function capturePhoto() {
   const saubererVorname = s.vorname.replace(/\s+/g, '_');
   const dateiName = `${klassenName}_${saubererName}_${saubererVorname}_${s.id}.jpg`;
   
-  gefundeneBilder.value[dateiName] = { url: blobUrl };
+  // 1. Bild im Pool speichern/überschreiben
+  gefundeneBilder.value[dateiName] = { 
+    url: blobUrl,
+    isLive: true 
+  };
   
-  zuordnungen.value.push({ 
-    sId: s.id, 
-    bild: dateiName, 
-    reason: 'Live' 
-  });
+  // 2. LOGIK: Existiert bereits ein Match für diesen Schüler?
+  const bestehenderMatchIndex = zuordnungen.value.findIndex(z => z.sId === s.id);
+
+  if (bestehenderMatchIndex !== -1) {
+    // Vorhandenen Match aktualisieren (verhindert Erhöhung der Anzahl)
+    zuordnungen.value[bestehenderMatchIndex].bild = dateiName;
+    zuordnungen.value[bestehenderMatchIndex].reason = 'Live (Update)';
+    showToast(`Foto für ${s.vorname} aktualisiert`, 'info');
+  } else {
+    // Neuen Match hinzufügen
+    zuordnungen.value.push({ 
+      sId: s.id, 
+      bild: dateiName, 
+      reason: 'Live' 
+    });
+    showToast(`Foto für ${s.vorname} erstellt`, 'success');
+  }
 
   stopCamera();
-  showToast(`Foto für ${s.vorname} ${s.nachname} erstellt!`, 'success');
 }
 
 // NEU: Einzelnes Bild auf Festplatte speichern
@@ -444,7 +454,7 @@ async function downloadAllLiveImages() {
 
 
 function leereBilderPool() {
-  if (confirm("Möchtest du wirklich alle Bilder aus dem Pool und alle aktuellen Zuordnungen löschen?")) {
+  if (confirm("Möchtest du wirklich den Pool leeren und alle aktuellen Zuordnungen löschen?")) {
     gefundeneBilder.value = {};
     zuordnungen.value = [];
     showToast("Bilder-Pool wurde geleert", "info");
@@ -455,7 +465,7 @@ function zeigeLeerenModal() {
   deleteModal.show = true; // KEIN .value
   deleteModal.mode = 'pool';
   deleteModal.titel = 'Bilder-Pool leeren';
-  deleteModal.nachricht = 'Möchtest du wirklich alle Bilder aus dem Pool und alle aktuellen Zuordnungen löschen?';
+  deleteModal.nachricht = 'Möchtest du wirklich den Pool leeren und alle aktuellen Zuordnungen löschen?';
 }
 
 function entferneBildAusPool(dateiname) {
@@ -471,7 +481,7 @@ const confirmDelete = (s) => {
   deleteModal.show = true; // KEIN .value
   deleteModal.mode = 'svws';
   deleteModal.schueler = s;
-  deleteModal.titel = 'Foto aus SVWS löschen';
+  deleteModal.titel = 'Foto in Schild löschen';
   deleteModal.nachricht = `Möchtest du das Foto von ${s.vorname} ${s.nachname} wirklich löschen?`;
 };
 
