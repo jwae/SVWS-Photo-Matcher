@@ -10,7 +10,7 @@ const schemataListe = ref([]);
 const isLoadingSchemata = ref(false); 
 const isLoggedIn = ref(false); 
 const isLoggingIn = ref(false);
-const credentials = reactive({ username: '', password: '' });
+const credentials = reactive({ username: 'waed', password: 'devau+2025' });
 const klassenListe = ref([]); 
 const selectedKlasse = ref(null); 
 const selectedSchueler = ref(null);
@@ -119,7 +119,7 @@ function autoMatch() {
 
   // Wenn der Bilder-Pool komplett leer ist, direkt abbrechen und informieren
   if (pool.length === 0) {
-    showToast("Bilder-Pool ist leer. Bitte zuerst Ordner laden.", "info");
+    showToast("Bilder-Pool ist leer. Bitte zuerst Fotos laden oder aufnehmen.", "info");
     return;
   }
 
@@ -223,15 +223,41 @@ async function uploadAllMatches() {
   }
 }
 
-async function executeDelete() {
-  try {
-    await axios.patch(`/schueler/${deleteModal.schueler.id}/stammdaten`, { foto: "" });
-    deleteModal.schueler.hatFoto = false; 
-    deleteModal.show = false;
-    showToast("Foto gelöscht");
-  } catch { showToast("Löschen fehlgeschlagen", "danger"); }
-}
 
+async function executeDelete() {
+  const mode = deleteModal.mode;
+
+  try {
+    if (mode === 'svws') {
+      // --- DEIN ERFOLGREICHER WEG ---
+      const s = deleteModal.schueler;
+      await axios.patch(`/schueler/${s.id}/stammdaten`, { foto: "" });
+      
+      s.hatFoto = false; // Icon in der Liste aktualisieren
+      showToast(`Foto von ${s.vorname} ${s.nachname} gelöscht`, "success");
+    } 
+    else if (mode === 'pool') {
+      // --- DEN GESAMTEN BILDER-POOL LEEREN ---
+      gefundeneBilder.value = {};
+      zuordnungen.value = [];
+      showToast("Bilder-Pool geleert", "info");
+    } 
+    else if (mode === 'einzelbild') {
+      // --- EINZELNES BILD AUS DEM POOL ENTFERNEN ---
+      const name = deleteModal.bildName;
+      delete gefundeneBilder.value[name];
+      // Match-Zahlen beim Schüler entfernen
+      zuordnungen.value = zuordnungen.value.filter(z => z.bild !== name);
+      showToast("Bild entfernt", "info");
+    }
+  } catch (error) {
+    console.error("Fehler beim Löschen:", error);
+    showToast("Aktion fehlgeschlagen", "danger");
+  } finally {
+    // Modal in jedem Fall schließen
+    deleteModal.show = false;
+  }
+}
 // --- 6. VORSCHAU & HELPER ---
 function previewLocalImage(name, url) { previewImage.value = { url, name }; }
 
@@ -242,7 +268,8 @@ async function fetchAndShowDBFoto(s) {
   } catch { showToast("Fehler beim Laden", "danger"); }
 }
 
-function confirmDelete(s) { deleteModal.schueler = s; deleteModal.show = true; }
+
+
 function showToast(msg, type = 'info') { toast.value = { show: true, message: msg, type }; setTimeout(() => toast.value.show = false, 3000); }
 function logout() { isLoggedIn.value = false; }
 function resetMatches() { zuordnungen.value = []; }
@@ -295,6 +322,9 @@ function stopCamera() {
   camera.schueler = null;
 }
 
+// --- 7. KAMERA-LOGIK ---
+// --- 7. KAMERA-LOGIK ---
+
 async function capturePhoto() {
   if (!videoPlayer.value || !captureCanvas.value || !camera.schueler) return;
 
@@ -303,11 +333,24 @@ async function capturePhoto() {
   const context = canvas.getContext('2d');
   const s = camera.schueler;
 
-  // Zielformat SVWS (119x160)
-  canvas.width = 119;
-  canvas.height = 160;
+// --- KLASSEN-RETTUNG ---
+  // 1. Wir prüfen, ob im Filter eine Klasse gewählt wurde.
+  // 2. Falls ja, nehmen wir deren Bezeichnung.
+  // 3. Falls nein oder falls die Bezeichnung fehlt, nehmen wir '00'.
+  let klassenName = '00';
+  
+ if (selectedKlasse.value && selectedKlasse.value.kuerzel) {
+    // Wir nehmen 'kuerzel', weil das in deinem HTML steht!
+    klassenName = selectedKlasse.value.kuerzel.replace(/\s+/g, '_');
+  } 
 
-  // Ausschnitt berechnen (Zentrieren des Gesichts)
+
+  // 1. DREIFACHE AUFLÖSUNG: 119x3 = 357, 160x3 = 480
+  const factor = 3;
+  canvas.width = 119 * factor;
+  canvas.height = 160 * factor;
+
+  // Ausschnitt berechnen (Zentrieren)
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const sourceAspect = sourceWidth / sourceHeight;
@@ -327,24 +370,20 @@ async function capturePhoto() {
     offsetY = (sourceHeight - drawHeight) / 2;
   }
 
-  // Bild vom Video-Stream in das Canvas zeichnen
-  context.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, 119, 160);
+  // Bild in hoher Auflösung zeichnen
+  context.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
   
-  // Bild konvertieren
   const imageData = canvas.toDataURL('image/jpeg', 0.9);
   const response = await fetch(imageData);
   const blob = await response.blob();
   const blobUrl = URL.createObjectURL(blob);
-  
-  // DATEINAME: Nachname_Vorname_ID.jpg (Sorgt für Eindeutigkeit)
+    
   const saubererName = s.nachname.replace(/\s+/g, '_');
   const saubererVorname = s.vorname.replace(/\s+/g, '_');
-  const dateiName = `${saubererName}_${saubererVorname}_${s.id}.jpg`;
+  const dateiName = `${klassenName}_${saubererName}_${saubererVorname}_${s.id}.jpg`;
   
-  // In den Bilder-Pool einfügen
   gefundeneBilder.value[dateiName] = { url: blobUrl };
   
-  // Automatisch matchen
   zuordnungen.value.push({ 
     sId: s.id, 
     bild: dateiName, 
@@ -355,6 +394,86 @@ async function capturePhoto() {
   showToast(`Foto für ${s.vorname} ${s.nachname} erstellt!`, 'success');
 }
 
+// NEU: Einzelnes Bild auf Festplatte speichern
+function downloadSingleImage(fileName) {
+  const imageData = gefundeneBilder.value[fileName];
+  if (!imageData) return;
+
+  const link = document.createElement('a');
+  link.href = imageData.url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast("Bild gespeichert");
+}
+
+async function downloadAllLiveImages() {
+  // 1. Alle Bilder finden, die das 'isLive' Flag haben
+  const liveBilderNamen = Object.keys(gefundeneBilder.value).filter(name => 
+    gefundeneBilder.value[name].isLive === true
+  );
+
+  if (liveBilderNamen.length === 0) {
+    showToast("Keine Live-Fotos zum Exportieren gefunden.", "info");
+    return;
+  }
+
+  showToast(`${liveBilderNamen.length} Fotos werden vorbereitet...`, "success");
+
+  // 2. Schleife durch die gefundenen Live-Bilder
+  for (const name of liveBilderNamen) {
+    const data = gefundeneBilder.value[name];
+    
+    // Wir erstellen einen unsichtbaren Download-Link für jedes Bild
+    const link = document.createElement('a');
+    link.href = data.url;
+    link.download = name; // Nutzt den generierten Namen: Klasse_Nachname_Vorname_ID.jpg
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Kleine Pause einbauen, damit der Browser nicht blockiert (optional)
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  showToast("Export abgeschlossen!", "success");
+}
+
+
+
+
+function leereBilderPool() {
+  if (confirm("Möchtest du wirklich alle Bilder aus dem Pool und alle aktuellen Zuordnungen löschen?")) {
+    gefundeneBilder.value = {};
+    zuordnungen.value = [];
+    showToast("Bilder-Pool wurde geleert", "info");
+  }
+}
+
+function zeigeLeerenModal() {
+  deleteModal.show = true; // KEIN .value
+  deleteModal.mode = 'pool';
+  deleteModal.titel = 'Bilder-Pool leeren';
+  deleteModal.nachricht = 'Möchtest du wirklich alle Bilder aus dem Pool und alle aktuellen Zuordnungen löschen?';
+}
+
+function entferneBildAusPool(dateiname) {
+  deleteModal.show = true; // KEIN .value
+  deleteModal.mode = 'einzelbild';
+  deleteModal.bildName = dateiname;
+  deleteModal.titel = 'Bild entfernen';
+  deleteModal.nachricht = `Möchtest du das Bild "${dateiname}" wirklich aus dem Pool löschen?`;
+}
+
+const confirmDelete = (s) => {
+  // Das alert kannst du jetzt entfernen, wenn du magst
+  deleteModal.show = true; // KEIN .value
+  deleteModal.mode = 'svws';
+  deleteModal.schueler = s;
+  deleteModal.titel = 'Foto aus SVWS löschen';
+  deleteModal.nachricht = `Möchtest du das Foto von ${s.vorname} ${s.nachname} wirklich löschen?`;
+};
 
 </script>
 

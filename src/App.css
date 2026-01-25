@@ -115,3 +115,31 @@ table tr.selected-row { box-shadow: inset 6px 0 0 #0d6efd; }
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); /* Dunkler Rand außenrum */
     pointer-events: none;
 }
+
+/* Der Standard-Kreis (mit Match) */
+.match-circle {
+    width: 26px;
+    height: 26px;
+    background-color: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+/* Der leere Kreis (Platzhalter) */
+.circle-empty {
+    background-color: transparent;
+    border: 1px dashed #dee2e6; /* Dezente gestrichelte Linie */
+    color: transparent;
+}
+
+/* Optional: Ein Hover-Effekt für den leeren Kreis */
+tr:hover .circle-empty {
+    border-color: #0d6efd;
+    border-style: solid;
+}
