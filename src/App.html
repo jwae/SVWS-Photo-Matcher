@@ -58,10 +58,10 @@
                         <h4 class="mb-0 fw-bold text-primary">SVWS Photo-Matcher</h4>
                         <small class="text-muted">Datenbank: <strong>{{ dbName }}</strong></small>
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2">                        
                         <button @click="$refs.fileInput.click()" class="btn btn-outline-primary btn-sm fw-bold px-3 rounded-pill">
-                            <i class="bi bi-folder-plus me-1"></i> Ordner laden
-                        </button>
+                            <i class="bi bi-folder-plus me-1"></i> Foto-Ordner laden
+                        </button>                        
                         <input type="file" ref="fileInput" @change="handleFolderUpload" webkitdirectory directory multiple hidden>
                         
                         <button v-if="zuordnungen.length > 0" @click="uploadAllMatches" class="btn btn-success btn-sm fw-bold px-3 rounded-pill shadow-sm" :disabled="uploadStatus.active">
@@ -87,17 +87,24 @@
                     <select v-model="selectedKlasse" class="form-select form-select-sm w-auto border-0 shadow-sm" @change="handleKlassenWechsel">
                         <option v-for="k in klassenListe" :key="k.id" :value="k">{{ k.kuerzel }}</option>
                     </select>
-                  <div class="ms-auto d-flex gap-2">
-                        <button v-if="zuordnungen.length > 0" @click="resetMatches" class="btn btn-outline-light btn-sm fw-bold px-3 rounded-pill">
-                            Matches-Löschen
-                        </button>
+                    <div class="ms-auto d-flex gap-2">
                         
+                        
+                        <button @click="resetMatches" 
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="zuordnungen.length === 0"
+                                title="Alle aktuellen Zuordnungen aufheben">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Matches löschen</span>
+                        </button>
+
+
                         <button @click="autoMatch" 
-                                class="btn btn-light btn-sm fw-bold text-primary shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
                                 title="Sucht im Bilder-Pool nach Übereinstimmungen mit Name + Vorname oder der Schüler-ID.">
                             <i class="bi bi-magic"></i> Auto-Match
                         </button>
-                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0 overflow-auto" style="max-height: 65vh;">
                     <table class="table table-hover align-middle mb-0">
@@ -107,7 +114,8 @@
                                 <th class="text-center" style="width: 70px;">SVWS</th>
                                 <th class="text-center" style="width: 80px;">ID</th>
                                 <th>Name, Vorname</th>
-                                <th class="text-end pe-3" style="width: 80px;">Foto</th>
+                                <th class="text-center" style="width: 80px;">Live</th>
+                                <th class="text-center" style="width: 80px;">Foto</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -115,26 +123,45 @@
                                 @click="handleSchuelerKlick(s)" 
                                 :class="{'selected-row': selectedSchueler && selectedSchueler.id === s.id}" 
                                 class="cursor-pointer">
-                                <td class="text-center">
-                                    <div v-if="getMatchIndex(s.id)" class="match-circle mx-auto">{{ getMatchIndex(s.id) }}</div>
-                                    <i v-else class="bi bi-person opacity-25"></i>
+                                
+                                
+                              <td class="text-center" style="width: 60px;">
+                                    <div :class="['match-circle mx-auto fw-bold shadow-sm', getMatchIndex(s.id) ? 'bg-danger text-white border-0' : 'circle-empty']">
+                                        {{ getMatchIndex(s.id) || '' }}
+                                    </div>
                                 </td>
-                                <td class="text-center">
-                                    <i v-if="s.hatFoto" class="bi bi-camera-fill text-primary fs-4" @click.stop="fetchAndShowDBFoto(s)"></i>
-                                    <i v-else class="bi bi-camera text-muted opacity-25 fs-4"></i>
+
+
+                               <td class="text-center">
+                                    <i v-if="s.hatFoto" 
+                                    class="bi bi-person-square text-primary fs-4 cursor-pointer" 
+                                    @click.stop="fetchAndShowDBFoto(s)"
+                                    title="Foto in Schild vorhanden"></i>
+                                    <i v-else 
+                                    class="bi bi-person-square text-muted opacity-25 fs-4"></i>
                                 </td>
                                 <td class="text-center">
                                     <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="font-size: 0.75rem;">{{ s.id }}</span>
                                 </td>
                                 <td class="fw-medium">{{ s.nachname }}, {{ s.vorname }}</td>
-                                <td class="text-end pe-3">
+                                <td class="text-center">
+                                    <button @click.stop="startCamera(s)" 
+                                            class="btn btn-outline-secondary btn-sm border-0 rounded-circle" 
+                                            title="Live-Kamera öffnen">
+                                        <i class="bi bi-camera fs-5"></i>
+                                    </button>
+                                </td>
+                                <td class="text-center">
+                                    
                                     <button v-if="s.hatFoto" 
                                             class="btn btn-link btn-sm text-danger p-0" 
-                                            title="Schülerfoto aus der Schild-Datenbank löschen" 
+                                            title="Foto in Schild löschen"
                                             @click.stop="confirmDelete(s)">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                    </td>
+
+
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -144,20 +171,57 @@
 
         <div class="col-md-5">
             <div class="card shadow-sm border-0 h-100 rounded-4 overflow-hidden">
-                <div class="card-header bg-success text-white py-3 border-0">
-                    <h5 class="mb-0 fw-bold">Bilder Pool</h5>
+
+                <div class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 d-flex align-items-center gap-2">                        
+                        Bilder-Pool
+                        <span v-if="anzahlBilderImPool > 0" class="badge rounded-pill bg-white text-dark shadow-sm" style="font-size: 0.8rem;">
+                            {{ anzahlBilderImPool }}
+                        </span>
+                        </h5>
+                    
+                    <div class="d-flex gap-2">
+                        <button @click="downloadAllLiveImages" 
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="!Object.values(gefundeneBilder).some(b => b.isLive)"
+                                title="Alle Live-Bilder speichern">
+                            <i class="bi bi-cloud-download"></i>
+                            <span>Live-JPGs exportieren</span>
+                        </button>
+                        
+                        <button @click="zeigeLeerenModal" 
+                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                                :disabled="Object.keys(gefundeneBilder).length === 0"
+                                title="Pool komplett leeren">
+                            <i class="bi bi-trash3"></i>
+                            <span>Bilder-Pool leeren</span>
+                        </button>
+                    </div>
                 </div>
+
+                
                 <div class="card-body p-0 overflow-auto" style="max-height: 65vh;">
                     <table class="table table-hover align-middle mb-0" style="table-layout: fixed;">
                         <tbody>
                             <tr v-for="(data, name) in gefundeneBilder" :key="name" 
                                 class="cursor-pointer" @click="handleBildKlick(name)">
-                                <td style="width: 75px;" class="ps-3">
-                                    <div class="position-relative" style="width: 50px;">
-                                        <img :src="data.url" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover;">
-                                        <div v-if="getMatchIndexByBild(name)" class="match-circle floating-badge">{{ getMatchIndexByBild(name) }}</div>
-                                    </div>
-                                </td>
+                                
+                                
+                                
+<td style="width: 75px;" class="ps-3">
+    <div class="position-relative" style="width: 50px;">
+        <img :src="data.url" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover;">
+        
+        <div v-if="getMatchIndexByBild(name)" 
+             class="match-circle bg-danger text-white border-0 shadow-sm d-flex align-items-center justify-content-center fw-bold" 
+             style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; font-size: 0.75rem; z-index: 2;">
+            {{ getMatchIndexByBild(name) }}
+        </div>
+    </div>
+</td>
+
+
+
                                 <td class="overflow-hidden">
                                     <div class="fw-bold small text-truncate" :title="name">{{ name }}</div>
                                     <div v-if="getMatchInfo(name)" class="d-flex align-items-center gap-1 mt-1">
@@ -165,11 +229,33 @@
                                         <span class="badge bg-secondary-subtle text-dark x-small-badge">{{ getMatchInfo(name).reason }}</span>
                                     </div>
                                 </td>
-                                <td class="text-end pe-3" style="width: 60px;">
-                                    <button class="btn btn-outline-secondary btn-sm border-0 rounded-circle" @click.stop="previewLocalImage(name, data.url)">
-                                        <i class="bi bi-search"></i>
-                                    </button>
-                                </td>
+                                
+                              <td class="text-end pe-3" style="width: 120px;">
+    <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
+                @click.stop="downloadSingleImage(name)"
+                title="Dieses Bild speichern"
+                style="width: 32px; height: 32px;">
+            <i class="bi bi-download text-success"></i>
+        </button>
+        
+        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
+                @click.stop="previewLocalImage(name, data.url)"
+                title="Vorschau"
+                style="width: 32px; height: 32px;">
+            <i class="bi bi-search text-primary"></i>
+        </button>
+        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
+                @click.stop="entferneBildAusPool(name)"
+                title="Aus Bilder-Pool entfernen"
+                style="width: 32px; height: 32px;">
+            <i class="bi bi-trash text-danger"></i>
+        </button>
+    </div>
+</td>
+
+
+
                             </tr>
                         </tbody>
                     </table>
@@ -216,4 +302,61 @@
             <div class="text-muted small">Bild {{ uploadStatus.current }} von {{ uploadStatus.total }}</div>
         </div>
     </div>
+
+   <div v-if="camera && camera.active" class="modal-backdrop glass-backdrop"></div>
+
+    <div v-if="camera && camera.active" class="modal show d-block">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 bg-dark text-white">
+                <div class="modal-header border-secondary">
+                    <h6 class="modal-title">
+                        Foto aufnehmen: {{ camera?.schueler?.vorname }} {{ camera?.schueler?.nachname }}
+                    </h6>
+                    <button @click="stopCamera" class="btn-close btn-close-white shadow-none"></button>
+                </div>
+                <div class="modal-body p-0 position-relative bg-black d-flex justify-content-center">
+                    <video ref="videoPlayer" autoplay playsinline class="w-100" style="max-height: 70vh;"></video>
+                    <div class="camera-overlay-frame"></div>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <button @click="capturePhoto" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
+                        <i class="bi bi-camera-fill me-2"></i> Foto schießen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="deleteModal.show" class="modal-backdrop glass-backdrop"></div>
+<div v-if="deleteModal.show" class="modal show d-block">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 p-4 text-center bg-white">
+            <div class="mb-3">
+                <i :class="deleteModal.mode === 'pool' ? 'bi-trash3-fill' : 'bi-exclamation-triangle'" 
+                   class="bi text-danger fs-1"></i>
+            </div>
+            
+            <h6 class="fw-bold mb-3">
+    {{ deleteModal.titel || 'Foto löschen?' }}
+</h6>
+
+<p class="small text-muted mb-4">
+    <template v-if="deleteModal.mode === 'einzelbild' || deleteModal.mode === 'pool'">
+        {{ deleteModal.nachricht }}
+    </template>
+    <template v-else>
+        Foto von {{ deleteModal.schueler?.vorname }} {{ deleteModal.schueler?.nachname }} permanent aus SVWS löschen?
+    </template>
+</p>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">Nein</button>
+                <button class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm" @click="executeDelete">Löschen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <canvas ref="captureCanvas" style="display:none;"></canvas>
+
 </div>
