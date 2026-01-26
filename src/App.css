@@ -143,3 +143,9 @@ tr:hover .circle-empty {
     border-color: #0d6efd;
     border-style: solid;
 }
+
+
+.glass-backdrop {
+    background-color: rgba(0, 0, 0, 0.1) !important; /* Sehr dezente Abdunklung */
+    backdrop-filter: blur(2px); /* Optional: Ein leichter Blur-Effekt wirkt moderner als pures Schwarz */
+}

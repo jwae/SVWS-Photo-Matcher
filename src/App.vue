@@ -485,7 +485,50 @@ const confirmDelete = (s) => {
   deleteModal.nachricht = `Möchtest du das Foto von ${s.vorname} ${s.nachname} wirklich löschen?`;
 };
 
+import jw from './assets/jw.jpg';
+const spendeHTML = `
+    <div class="text-center">
+        <div class="mb-3">
+            <img src="${jw}" alt="Profilfoto" class="rounded-circle shadow-sm" style="width: 75px; height: 75px; object-fit: cover;">
+        </div>
+                
+        <p class="text-muted mb-3" style="font-size: 0.85rem; line-height: 1.5;">
+            Ich entwickle dieses Tool, damit der Foto-Workflow in Schulen stressfrei läuft. 
+            Ich glaube fest an Open Source, aber Code schreibt sich leider nicht von allein.
+            Jeder Euro hilft mir, das Projekt unabhängig und werbefrei zu halten.
+        </p>
+
+        <div class="d-grid gap-2">
+            <a href="https://paypal.me/DEIN_NAME/5" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold d-flex justify-content-between align-items-center text-decoration-none px-3">
+                <span>Kleiner Support</span> <span>5 €</span>
+            </a>
+            <a href="https://paypal.me/DEIN_NAME/10" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold d-flex justify-content-between align-items-center text-decoration-none px-3">
+                <span>Standard</span> <span>10 €</span>
+            </a>
+            <a href="https://paypal.me/DEIN_NAME" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold text-decoration-none">
+                Anderer Betrag
+            </a>
+        </div>
+        
+        <p class="mt-3 mb-0 small text-secondary" style="font-size: 0.75rem;">
+    Vielen Dank für deine Hilfe! JW <i class="bi bi-emoji-smile ms-1"></i>
+</p>
+    </div>
+`;
+
+function zeigeInfoModal() {
+  deleteModal.titel = "Unterstütze das Projekt";
+  deleteModal.mode = "info"; // Wichtig für das v-if oben!
+  deleteModal.nachricht = spendeHTML; // Hier kommt dein langer String mit der Karte rein
+  deleteModal.show = true;
+}
+
+
+
 </script>
+
+
+
 
 <template src="./App.html"></template>
 <style scoped src="./App.css"></style>

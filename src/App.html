@@ -1,8 +1,8 @@
 <div class="container-fluid py-4 bg-light min-vh-100 position-relative text-dark font-sans">
-    
+
     <div v-if="toast.show" class="import-notification">
-        <div class="d-flex align-items-center px-4 py-3 rounded-pill shadow-lg border animate-fade-in" 
-             :class="toast.type === 'success' ? 'bg-success text-white border-success' : 'bg-dark text-white border-secondary'">
+        <div class="d-flex align-items-center px-4 py-3 rounded-pill shadow-lg border animate-fade-in"
+            :class="toast.type === 'success' ? 'bg-success text-white border-success' : 'bg-dark text-white border-secondary'">
             <i class="bi me-3 fs-5" :class="toast.type === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle'"></i>
             <span class="fw-bold">{{ toast.message }}</span>
         </div>
@@ -12,7 +12,7 @@
         <div class="col-md-4">
             <div class="card shadow border p-4 rounded-4">
                 <h4 class="fw-bold mb-4 text-center text-secondary">SVWS Photo-Matcher</h4>
-                
+
                 <div class="mb-3">
                     <label class="small fw-bold text-muted mb-1 ps-1">Server URL</label>
                     <div class="input-group shadow-sm rounded-3 overflow-hidden">
@@ -26,7 +26,8 @@
 
                 <div class="mb-3">
                     <label class="small fw-bold text-muted mb-1 ps-1">Datenbank (Schema)</label>
-                    <select v-model="dbName" class="form-select border bg-light shadow-none" :disabled="schemataListe.length === 0">
+                    <select v-model="dbName" class="form-select border bg-light shadow-none"
+                        :disabled="schemataListe.length === 0">
                         <option value="" disabled>-- Schema wählen --</option>
                         <option v-for="s in schemataListe" :key="s" :value="s">{{ s }}</option>
                     </select>
@@ -38,10 +39,12 @@
                 </div>
                 <div class="mb-4">
                     <label class="small fw-bold text-muted mb-1 ps-1">Passwort</label>
-                    <input v-model="credentials.password" type="password" class="form-control border bg-light" @keyup.enter="performLogin">
+                    <input v-model="credentials.password" type="password" class="form-control border bg-light"
+                        @keyup.enter="performLogin">
                 </div>
-                
-                <button @click="performLogin" class="btn btn-primary w-100 fw-bold py-2 shadow" :disabled="!dbName || isLoggingIn">
+
+                <button @click="performLogin" class="btn btn-primary w-100 fw-bold py-2 shadow"
+                    :disabled="!dbName || isLoggingIn">
                     <span v-if="isLoggingIn" class="spinner-border spinner-border-sm me-2"></span>
                     ANMELDEN
                 </button>
@@ -50,7 +53,7 @@
     </div>
 
     <div v-else class="row g-4 animate-fade-in">
-        
+
         <div class="col-12">
             <div class="card border-0 shadow-sm p-3 bg-white rounded-4">
                 <div class="d-flex flex-row justify-content-between align-items-center mb-3">
@@ -58,25 +61,43 @@
                         <h4 class="mb-0 fw-bold text-primary">SVWS Photo-Matcher</h4>
                         <small class="text-muted">Datenbank: <strong>{{ dbName }}</strong></small>
                     </div>
-                    <div class="d-flex gap-2">                        
-                        <button @click="$refs.fileInput.click()" class="btn btn-outline-primary btn-sm fw-bold px-3 rounded-pill">
+                    <div class="d-flex gap-2">
+                        <button @click="$refs.fileInput.click()"
+                            class="btn btn-outline-primary btn-sm fw-bold px-3 rounded-pill">
                             <i class="bi bi-folder-plus me-1"></i> Foto-Ordner laden
-                        </button>                        
-                        <input type="file" ref="fileInput" @change="handleFolderUpload" webkitdirectory directory multiple hidden>
-                        
-                        <button v-if="zuordnungen.length > 0" @click="uploadAllMatches" class="btn btn-success btn-sm fw-bold px-3 rounded-pill shadow-sm" :disabled="uploadStatus.active">
+                        </button>
+                        <input type="file" ref="fileInput" @change="handleFolderUpload" webkitdirectory directory
+                            multiple hidden>
+
+                        <button v-if="zuordnungen.length > 0" @click="uploadAllMatches"
+                            class="btn btn-success btn-sm fw-bold px-3 rounded-pill shadow-sm"
+                            :disabled="uploadStatus.active">
                             <i class="bi bi-cloud-upload me-1"></i> {{ zuordnungen.length }} Matches hochladen
                         </button>
                         <button @click="logout" class="btn btn-primary btn-sm fw-bold px-3 rounded-pill">Logout</button>
                     </div>
                 </div>
 
-                <div class="alert alert-info border-0 mb-0 py-2 px-3 rounded-3 d-flex align-items-center shadow-sm">
-                    <i class="bi bi-info-circle-fill me-3 fs-5"></i>
-                    <div class="small">
-                        <strong>Anleitung:</strong> Wählen Sie links einen <strong>Schüler</strong> und dann rechts das <strong>Foto</strong>. 
-                    </div>
-                </div>
+<div class="alert alert-success border-0 mb-0 py-2 px-3 rounded-3 d-flex align-items-center justify-content-between shadow-sm">
+    
+    <div class="d-flex align-items-center">
+        <i class="bi bi-info-circle-fill me-3 fs-5"></i>
+        <div class="small">
+            <strong>Anleitung:</strong> Wählen Sie links einen <strong>Schüler</strong> und dann rechts das
+            <strong>Foto</strong>.
+        </div>
+    </div>
+
+    <button @click="zeigeInfoModal"
+        class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3 rounded-pill d-flex align-items-center gap-2">
+        <i class="bi bi-piggy-bank"></i>
+        <span>Info / Spende</span>
+    </button>
+
+</div>
+
+
+
             </div>
         </div>
 
@@ -84,24 +105,24 @@
             <div class="card shadow-sm border-0 h-100 rounded-4 overflow-hidden">
                 <div class="card-header bg-primary text-white d-flex align-items-center py-3 border-0">
                     <h5 class="mb-0 fw-bold me-3">Klasse</h5>
-                    <select v-model="selectedKlasse" class="form-select form-select-sm w-auto border-0 shadow-sm" @change="handleKlassenWechsel">
+                    <select v-model="selectedKlasse" class="form-select form-select-sm w-auto border-0 shadow-sm"
+                        @change="handleKlassenWechsel">
                         <option v-for="k in klassenListe" :key="k.id" :value="k">{{ k.kuerzel }}</option>
                     </select>
                     <div class="ms-auto d-flex gap-2">
-                        
-                        
-                        <button @click="resetMatches" 
-                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
-                                :disabled="zuordnungen.length === 0"
-                                title="Alle aktuellen Zuordnungen aufheben">
+
+
+                        <button @click="resetMatches"
+                            class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                            :disabled="zuordnungen.length === 0" title="Alle aktuellen Zuordnungen aufheben">
                             <i class="bi bi-arrow-counterclockwise"></i>
                             <span>Matches löschen</span>
                         </button>
 
 
-                        <button @click="autoMatch" 
-                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
-                                title="Sucht im Bilder-Pool nach Übereinstimmungen mit Name + Vorname oder der Schüler-ID.">
+                        <button @click="autoMatch"
+                            class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                            title="Sucht im Bilder-Pool nach Übereinstimmungen mit Name + Vorname oder der Schüler-ID.">
                             <i class="bi bi-magic"></i> Auto-Match
                         </button>
                     </div>
@@ -119,44 +140,40 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="s in sortierteSchueler" :key="s.id" 
-                                @click="handleSchuelerKlick(s)" 
-                                :class="{'selected-row': selectedSchueler && selectedSchueler.id === s.id}" 
+                            <tr v-for="s in sortierteSchueler" :key="s.id" @click="handleSchuelerKlick(s)"
+                                :class="{'selected-row': selectedSchueler && selectedSchueler.id === s.id}"
                                 class="cursor-pointer">
-                                
-                                
-                              <td class="text-center" style="width: 60px;">
-                                    <div :class="['match-circle mx-auto fw-bold shadow-sm', getMatchIndex(s.id) ? 'bg-danger text-white border-0' : 'circle-empty']">
+
+
+                                <td class="text-center" style="width: 60px;">
+                                    <div
+                                        :class="['match-circle mx-auto fw-bold shadow-sm', getMatchIndex(s.id) ? 'bg-danger text-white border-0' : 'circle-empty']">
                                         {{ getMatchIndex(s.id) || '' }}
                                     </div>
                                 </td>
 
 
-                               <td class="text-center">
-                                    <i v-if="s.hatFoto" 
-                                    class="bi bi-person-square text-primary fs-4 cursor-pointer" 
-                                    @click.stop="fetchAndShowDBFoto(s)"
-                                    title="Foto in Schild vorhanden"></i>
-                                    <i v-else 
-                                    class="bi bi-person-square text-muted opacity-25 fs-4"></i>
+                                <td class="text-center">
+                                    <i v-if="s.hatFoto" class="bi bi-person-square text-primary fs-4 cursor-pointer"
+                                        @click.stop="fetchAndShowDBFoto(s)" title="Foto in Schild vorhanden"></i>
+                                    <i v-else class="bi bi-person-square text-muted opacity-25 fs-4"></i>
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge bg-light text-secondary border font-monospace px-2 py-1" style="font-size: 0.75rem;">{{ s.id }}</span>
+                                    <span class="badge bg-light text-secondary border font-monospace px-2 py-1"
+                                        style="font-size: 0.75rem;">{{ s.id }}</span>
                                 </td>
                                 <td class="fw-medium">{{ s.nachname }}, {{ s.vorname }}</td>
                                 <td class="text-center">
-                                    <button @click.stop="startCamera(s)" 
-                                            class="btn btn-outline-secondary btn-sm border-0 rounded-circle" 
-                                            title="Live-Kamera öffnen">
+                                    <button @click.stop="startCamera(s)"
+                                        class="btn btn-outline-secondary btn-sm border-0 rounded-circle"
+                                        title="Live-Kamera öffnen">
                                         <i class="bi bi-camera fs-5"></i>
                                     </button>
                                 </td>
                                 <td class="text-center">
-                                    
-                                    <button v-if="s.hatFoto" 
-                                            class="btn btn-link btn-sm text-danger p-0" 
-                                            title="Foto in Schild löschen"
-                                            @click.stop="confirmDelete(s)">
+
+                                    <button v-if="s.hatFoto" class="btn btn-link btn-sm text-danger p-0"
+                                        title="Foto in Schild löschen" @click.stop="confirmDelete(s)">
                                         <i class="bi bi-trash"></i>
                                     </button>
 
@@ -172,87 +189,91 @@
         <div class="col-md-5">
             <div class="card shadow-sm border-0 h-100 rounded-4 overflow-hidden">
 
-                <div class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 d-flex align-items-center gap-2">                        
+                <div
+                    class="card-header bg-success text-white py-3 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 d-flex align-items-center gap-2">
                         Bilder-Pool
-                        <span v-if="anzahlBilderImPool > 0" class="badge rounded-pill bg-white text-dark shadow-sm" style="font-size: 0.8rem;">
+                        <span v-if="anzahlBilderImPool > 0" class="badge rounded-pill bg-white text-dark shadow-sm"
+                            style="font-size: 0.8rem;">
                             {{ anzahlBilderImPool }}
                         </span>
-                        </h5>
-                    
+                    </h5>
+
                     <div class="d-flex gap-2">
-                        <button @click="downloadAllLiveImages" 
-                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
-                                :disabled="!Object.values(gefundeneBilder).some(b => b.isLive)"
-                                title="Alle Live-Bilder speichern">
+                        <button @click="downloadAllLiveImages"
+                            class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                            :disabled="!Object.values(gefundeneBilder).some(b => b.isLive)"
+                            title="Alle Live-Bilder speichern">
                             <i class="bi bi-cloud-download"></i>
                             <span>Live-JPGs exportieren</span>
                         </button>
-                        
-                        <button @click="zeigeLeerenModal" 
-                                class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
-                                :disabled="Object.keys(gefundeneBilder).length === 0"
-                                title="Pool komplett leeren">
+
+                        <button @click="zeigeLeerenModal"
+                            class="btn btn-light btn-sm fw-bold text-dark shadow-sm px-3 rounded-pill d-flex align-items-center gap-2"
+                            :disabled="Object.keys(gefundeneBilder).length === 0" title="Pool komplett leeren">
                             <i class="bi bi-trash3"></i>
                             <span>Bilder-Pool leeren</span>
                         </button>
                     </div>
                 </div>
 
-                
+
                 <div class="card-body p-0 overflow-auto" style="max-height: 65vh;">
                     <table class="table table-hover align-middle mb-0" style="table-layout: fixed;">
                         <tbody>
-                            <tr v-for="(data, name) in gefundeneBilder" :key="name" 
-                                class="cursor-pointer" @click="handleBildKlick(name)">
-                                
-                                
-                                
-<td style="width: 75px;" class="ps-3">
-    <div class="position-relative" style="width: 50px;">
-        <img :src="data.url" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover;">
-        
-        <div v-if="getMatchIndexByBild(name)" 
-             class="match-circle bg-danger text-white border-0 shadow-sm d-flex align-items-center justify-content-center fw-bold" 
-             style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; font-size: 0.75rem; z-index: 2;">
-            {{ getMatchIndexByBild(name) }}
-        </div>
-    </div>
-</td>
+                            <tr v-for="(data, name) in gefundeneBilder" :key="name" class="cursor-pointer"
+                                @click="handleBildKlick(name)">
+
+
+
+                                <td style="width: 75px;" class="ps-3">
+                                    <div class="position-relative" style="width: 50px;">
+                                        <img :src="data.url" class="rounded border shadow-sm"
+                                            style="width: 50px; height: 50px; object-fit: cover;">
+
+                                        <div v-if="getMatchIndexByBild(name)"
+                                            class="match-circle bg-danger text-white border-0 shadow-sm d-flex align-items-center justify-content-center fw-bold"
+                                            style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; font-size: 0.75rem; z-index: 2;">
+                                            {{ getMatchIndexByBild(name) }}
+                                        </div>
+                                    </div>
+                                </td>
 
 
 
                                 <td class="overflow-hidden">
                                     <div class="fw-bold small text-truncate" :title="name">{{ name }}</div>
                                     <div v-if="getMatchInfo(name)" class="d-flex align-items-center gap-1 mt-1">
-                                        <span class="text-success fw-bold x-small text-truncate">{{ getMatchInfo(name).schuelerName }}</span>
-                                        <span class="badge bg-secondary-subtle text-dark x-small-badge">{{ getMatchInfo(name).reason }}</span>
+                                        <span class="text-success fw-bold x-small text-truncate">{{
+                                            getMatchInfo(name).schuelerName }}</span>
+                                        <span class="badge bg-secondary-subtle text-dark x-small-badge">{{
+                                            getMatchInfo(name).reason }}</span>
                                     </div>
                                 </td>
-                                
-                              <td class="text-end pe-3" style="width: 120px;">
-    <div class="d-flex gap-2 justify-content-end">
-        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
-                @click.stop="downloadSingleImage(name)"
-                title="Dieses Bild speichern"
-                style="width: 32px; height: 32px;">
-            <i class="bi bi-download text-success"></i>
-        </button>
-        
-        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
-                @click.stop="previewLocalImage(name, data.url)"
-                title="Vorschau"
-                style="width: 32px; height: 32px;">
-            <i class="bi bi-search text-primary"></i>
-        </button>
-        <button class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center" 
-                @click.stop="entferneBildAusPool(name)"
-                title="Aus Bilder-Pool entfernen"
-                style="width: 32px; height: 32px;">
-            <i class="bi bi-trash text-danger"></i>
-        </button>
-    </div>
-</td>
+
+                                <td class="text-end pe-3" style="width: 120px;">
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button
+                                            class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center"
+                                            @click.stop="downloadSingleImage(name)" title="Dieses Bild speichern"
+                                            style="width: 32px; height: 32px;">
+                                            <i class="bi bi-download text-success"></i>
+                                        </button>
+
+                                        <button
+                                            class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center"
+                                            @click.stop="previewLocalImage(name, data.url)" title="Vorschau"
+                                            style="width: 32px; height: 32px;">
+                                            <i class="bi bi-search text-primary"></i>
+                                        </button>
+                                        <button
+                                            class="btn btn-light btn-sm border shadow-sm rounded-circle p-2 d-flex align-items-center justify-content-center"
+                                            @click.stop="entferneBildAusPool(name)" title="Aus Bilder-Pool entfernen"
+                                            style="width: 32px; height: 32px;">
+                                            <i class="bi bi-trash text-danger"></i>
+                                        </button>
+                                    </div>
+                                </td>
 
 
 
@@ -286,7 +307,8 @@
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content border-0 shadow rounded-4 p-4 text-center">
                 <i class="bi bi-exclamation-triangle text-danger fs-1 mb-2"></i>
-                <h6 class="fw-bold mb-3">Foto von {{ deleteModal.schueler?.vorname }} {{ deleteModal.schueler?.nachname }} löschen?</h6>
+                <h6 class="fw-bold mb-3">Foto von {{ deleteModal.schueler?.vorname }} {{ deleteModal.schueler?.nachname
+                    }} löschen?</h6>
                 <div class="d-flex gap-2">
                     <button class="btn btn-light w-100" @click="deleteModal.show = false">Abbrechen</button>
                     <button class="btn btn-danger w-100" @click="executeDelete">Löschen</button>
@@ -303,7 +325,7 @@
         </div>
     </div>
 
-   <div v-if="camera && camera.active" class="modal-backdrop glass-backdrop"></div>
+    <div v-if="camera && camera.active" class="modal-backdrop glass-backdrop"></div>
 
     <div v-if="camera && camera.active" class="modal show d-block">
         <div class="modal-dialog modal-md modal-dialog-centered">
@@ -328,34 +350,58 @@
     </div>
 
     <div v-if="deleteModal.show" class="modal-backdrop glass-backdrop"></div>
-<div v-if="deleteModal.show" class="modal show d-block">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4 p-4 text-center bg-white">
-            <div class="mb-3">
-                <i :class="deleteModal.mode === 'pool' ? 'bi-trash3-fill' : 'bi-exclamation-triangle'" 
-                   class="bi text-danger fs-1"></i>
+    <div v-if="deleteModal.show" class="modal show d-block">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 p-4 text-center bg-white">
+                <div class="mb-3">
+                    <i :class="deleteModal.mode === 'pool' ? 'bi-trash3-fill' : 'bi-exclamation-triangle'"
+                        class="bi text-danger fs-1"></i>
+                </div>
+
+                <h6 class="fw-bold mb-3">
+                    {{ deleteModal.titel || 'Foto löschen?' }}
+                </h6>
+
+                <p class="small text-muted mb-4">
+                    <template v-if="deleteModal.mode === 'einzelbild' || deleteModal.mode === 'pool'">
+                        {{ deleteModal.nachricht }}
+                    </template>
+                    <template v-else>
+                        Foto von {{ deleteModal.schueler?.vorname }} {{ deleteModal.schueler?.nachname }} permanent aus
+                        SVWS löschen?
+                    </template>
+                </p>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-light w-100 rounded-pill fw-bold"
+                        @click="deleteModal.show = false">Nein</button>
+                    <button class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm"
+                        @click="executeDelete">Löschen</button>
+                </div>
             </div>
-            
-            <h6 class="fw-bold mb-3">
-    {{ deleteModal.titel || 'Foto löschen?' }}
-</h6>
+        </div>
+    </div>
 
-<p class="small text-muted mb-4">
-    <template v-if="deleteModal.mode === 'einzelbild' || deleteModal.mode === 'pool'">
-        {{ deleteModal.nachricht }}
-    </template>
-    <template v-else>
-        Foto von {{ deleteModal.schueler?.vorname }} {{ deleteModal.schueler?.nachname }} permanent aus SVWS löschen?
-    </template>
-</p>
-
-            <div class="d-flex gap-2">
-                <button class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">Nein</button>
-                <button class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm" @click="executeDelete">Löschen</button>
+    <div v-if="deleteModal.show && deleteModal.mode === 'info'" class="modal-backdrop glass-backdrop"></div>
+<div v-if="deleteModal.show && deleteModal.mode === 'info'" class="modal show d-block" @click.self="deleteModal.show = false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold w-100 text-center mt-2">{{ deleteModal.titel }}</h5>
+                <button type="button" class="btn-close" @click="deleteModal.show = false"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div v-html="deleteModal.nachricht"></div>
+            </div>
+            <div class="modal-footer border-0 pb-4">
+                <button type="button" class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">
+                    Schließen
+                </button>
             </div>
         </div>
     </div>
 </div>
+
 
     <canvas ref="captureCanvas" style="display:none;"></canvas>
 
