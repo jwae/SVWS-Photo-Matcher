@@ -13,6 +13,7 @@ dist
 dist-ssr
 coverage
 *.local
+Thumbs.db
 
 # Editor directories and files
 .vscode/*
@@ -34,3 +35,7 @@ coverage
 
 # Vitest
 __screenshots__/
+
+# Umgebungsvariablen (HIER stehen oft Passwörter oder API-Keys)
+.env
+.env.local

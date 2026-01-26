@@ -3,14 +3,29 @@ import { ref, computed, reactive, onMounted } from 'vue'
 import axios from 'axios'
 import { scaleImage } from './imageUtils.js' // Die ausgelagerte Funktion
 
+// --- 0. ENV DATEN LADEN ---
+// Diese Werte kommen aus deiner .env Datei (lokal) oder den Vercel Settings (online)
+const ENV_HOST = import.meta.env.VITE_DB_HOST || '';
+const ENV_SCHEMA = import.meta.env.VITE_DB_SCHEMA || '';
+const ENV_USER = import.meta.env.VITE_DB_USER || '';
+const ENV_PASS = import.meta.env.VITE_DB_PASSWORD || '';
+
+
+
+
 // --- 1. STATES ---
-const serverName = ref('https://localhost'); 
-const dbName = ref(''); 
+//const serverName = ref('https://localhost'); 
+//const dbName = ref(''); 
+// const credentials = reactive({ username: '', password: '' });
+const serverName = ref(ENV_HOST); 
+const dbName = ref(ENV_SCHEMA);
+const credentials = reactive({ username: ENV_USER, password: ENV_PASS });
+
+
 const schemataListe = ref([]);
 const isLoadingSchemata = ref(false); 
 const isLoggedIn = ref(false); 
 const isLoggingIn = ref(false);
-const credentials = reactive({ username: '', password: '' });
 const klassenListe = ref([]); 
 const selectedKlasse = ref(null); 
 const selectedSchueler = ref(null);
