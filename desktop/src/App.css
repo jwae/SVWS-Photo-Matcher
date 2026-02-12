@@ -149,3 +149,22 @@ tr:hover .circle-empty {
     background-color: rgba(0, 0, 0, 0.1) !important; /* Sehr dezente Abdunklung */
     backdrop-filter: blur(2px); /* Optional: Ein leichter Blur-Effekt wirkt moderner als pures Schwarz */
 }
+
+.login-wrapper {
+  height: 80vh;
+  min-height: 600px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 1rem;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 900px;   /* optional, nach oben */
+  min-width: 600px;   /* 🔴 wichtig */
+
+  margin: 0 auto;
+}

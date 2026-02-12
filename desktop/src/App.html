@@ -8,19 +8,69 @@
         </div>
     </div>
 
-    <div v-if="!isLoggedIn" class="row justify-content-center pt-5">
-        <div class="col-md-4">
+    <!-- LOGIN: nimmt ~80% der Fensterhöhe ein -->
+    <!-- LOGIN: nimmt ~80% der Fensterhöhe ein -->
+    <div v-if="!isLoggedIn" class="login-wrapper">
+        <div class="login-container">
             <div class="card shadow border p-4 rounded-4">
                 <h4 class="fw-bold mb-4 text-center text-secondary">SVWS Photo-Matcher</h4>
 
-                <div class="mb-3">
-                    <label class="small fw-bold text-muted mb-1 ps-1">Server URL</label>
-                    <div class="input-group shadow-sm rounded-3 overflow-hidden">
-                        <input v-model="serverName" type="text" class="form-control border bg-light">
-                        <button @click="ladeSchemata" class="btn btn-primary" :disabled="isLoadingSchemata">
-                            <i v-if="isLoadingSchemata" class="spinner-border spinner-border-sm"></i>
-                            <i v-else class="bi bi-arrow-clockwise"></i>
+                <!-- Server-Adresse -->
+                <div class="mb-2">
+                    <label class="form-label mb-1">Server-Name</label>
+
+                    <div class="input-group">
+                        <input v-model="serverName" type="text" class="form-control"
+                            placeholder="z. B. https://SERVERNAME:3306" />
+
+                        <!-- Status rechts neben dem Feld -->
+                        <span v-if="serverTest.ok === true" class="input-group-text text-success"
+                            style="font-size: 0.85rem;">
+                            erreichbar
+                        </span>
+
+                        <span v-else-if="serverTest.ok === false" class="input-group-text text-danger"
+                            style="font-size: 0.85rem;">
+                            nicht erreichbar
+                        </span>
+
+                        <span v-else class="input-group-text text-muted" style="font-size: 0.85rem;">
+                            nicht getestet
+                        </span>
+                    </div>
+
+                    <!-- kleiner Hinweis (ohne Icon) -->
+                    <div v-if="serverHint" class="text-danger mt-1" style="font-size: 0.8rem; line-height: 1.3;">
+                        {{ serverHint }}
+                    </div>
+                </div>
+
+                <!-- Buttons: Server testen + Schemata laden -->
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-6">
+                        <button type="button" class="btn btn-outline-secondary w-100" @click="testServerConnection"
+                            :disabled="serverTest.running">
+                            <span v-if="serverTest.running" class="spinner-border spinner-border-sm me-2"></span>
+                            Server testen
                         </button>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <button type="button" class="btn btn-primary w-100" @click="ladeSchemata"
+                            :disabled="isLoadingSchemata || serverTest.running || serverTest.ok !== true">
+                            <span v-if="isLoadingSchemata" class="spinner-border spinner-border-sm me-2"></span>
+                            Schemata laden
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Platz für Test-Ergebnis / Fehlermeldung -->
+                <!-- Diagnose / Fehlermeldung nur bei FEHLER -->
+                <div v-if="serverTest.ok === false" class="mb-2">
+                    <div class="p-2 rounded border border-danger text-danger"
+                        style="font-size: 0.85rem; line-height: 1.35;">
+                        <div class="fw-bold">{{ serverTest.title }}</div>
+                        <div style="white-space: pre-line;">{{ serverTest.details }}</div>
                     </div>
                 </div>
 
@@ -33,21 +83,48 @@
                     </select>
                 </div>
 
-                <div class="mb-3">
-                    <label class="small fw-bold text-muted mb-1 ps-1">Benutzername</label>
-                    <input v-model="credentials.username" type="text" class="form-control border bg-light">
-                </div>
-                <div class="mb-4">
-                    <label class="small fw-bold text-muted mb-1 ps-1">Passwort</label>
-                    <input v-model="credentials.password" type="password" class="form-control border bg-light"
-                        @keyup.enter="performLogin">
+<form @submit.prevent="performLogin">
+
+  <div class="mb-3">
+    <label class="small fw-bold text-muted mb-1 ps-1">Benutzername</label>
+    <input
+      v-model="credentials.username"
+      type="text"
+      class="form-control border bg-light"
+    />
+  </div>
+
+  <div class="mb-4">
+    <label class="small fw-bold text-muted mb-1 ps-1">Passwort</label>
+    <input
+      v-model="credentials.password"
+      type="password"
+      class="form-control border bg-light"
+    />
+  </div>
+
+  <button
+    type="submit"
+    class="btn btn-primary w-100 fw-bold py-2 shadow"
+    :disabled="
+      isLoggingIn ||
+      serverTest.ok !== true ||
+      schemataListe.length === 0 ||
+      !dbName
+    "
+  >
+    <span v-if="isLoggingIn" class="spinner-border spinner-border-sm me-2"></span>
+    ANMELDEN
+  </button>
+
+</form>
+
+
+                <div v-if="loginError" class="text-danger mt-2" style="font-size:0.85rem; line-height:1.3;">
+                    {{ loginError }}
                 </div>
 
-                <button @click="performLogin" class="btn btn-primary w-100 fw-bold py-2 shadow"
-                    :disabled="!dbName || isLoggingIn">
-                    <span v-if="isLoggingIn" class="spinner-border spinner-border-sm me-2"></span>
-                    ANMELDEN
-                </button>
+
             </div>
         </div>
     </div>
@@ -78,23 +155,25 @@
                     </div>
                 </div>
 
-<div class="alert alert-success border-0 mb-0 py-2 px-3 rounded-3 d-flex align-items-center justify-content-between shadow-sm">
-    
-    <div class="d-flex align-items-center">
-        <i class="bi bi-info-circle-fill me-3 fs-5"></i>
-        <div class="small">
-            <strong>Anleitung:</strong> Wählen Sie links einen <strong>Schüler</strong> und dann rechts das
-            <strong>Foto</strong>.
-        </div>
-    </div>
+                <div
+                    class="alert alert-success border-0 mb-0 py-2 px-3 rounded-3 d-flex align-items-center justify-content-between shadow-sm">
 
-    <button @click="zeigeInfoModal"
-        class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3 rounded-pill d-flex align-items-center gap-2">
-        <i class="bi bi-piggy-bank"></i>
-        <span>Info / Spende</span>
-    </button>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-info-circle-fill me-3 fs-5"></i>
+                        <div class="small">
+                            <strong>Anleitung:</strong> Wählen Sie links einen <strong>Schüler</strong> und dann rechts
+                            das
+                            <strong>Foto</strong>.
+                        </div>
+                    </div>
 
-</div>
+                    <button @click="zeigeInfoModal"
+                        class="btn btn-outline-success btn-sm fw-bold shadow-sm px-3 rounded-pill d-flex align-items-center gap-2">
+                        <i class="bi bi-piggy-bank"></i>
+                        <span>Info / Spende</span>
+                    </button>
+
+                </div>
 
 
 
@@ -383,24 +462,26 @@
     </div>
 
     <div v-if="deleteModal.show && deleteModal.mode === 'info'" class="modal-backdrop glass-backdrop"></div>
-<div v-if="deleteModal.show && deleteModal.mode === 'info'" class="modal show d-block" @click.self="deleteModal.show = false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold w-100 text-center mt-2">{{ deleteModal.titel }}</h5>
-                <button type="button" class="btn-close" @click="deleteModal.show = false"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div v-html="deleteModal.nachricht"></div>
-            </div>
-            <div class="modal-footer border-0 pb-4">
-                <button type="button" class="btn btn-light w-100 rounded-pill fw-bold" @click="deleteModal.show = false">
-                    Schließen
-                </button>
+    <div v-if="deleteModal.show && deleteModal.mode === 'info'" class="modal show d-block"
+        @click.self="deleteModal.show = false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden bg-white">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold w-100 text-center mt-2">{{ deleteModal.titel }}</h5>
+                    <button type="button" class="btn-close" @click="deleteModal.show = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div v-html="deleteModal.nachricht"></div>
+                </div>
+                <div class="modal-footer border-0 pb-4">
+                    <button type="button" class="btn btn-light w-100 rounded-pill fw-bold"
+                        @click="deleteModal.show = false">
+                        Schließen
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
 
     <canvas ref="captureCanvas" style="display:none;"></canvas>

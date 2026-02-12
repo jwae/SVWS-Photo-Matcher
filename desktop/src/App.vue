@@ -1,31 +1,16 @@
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { scaleImage } from './imageUtils.js' // Die ausgelagerte Funktion
 
-// --- 0. ENV DATEN LADEN ---
-// Diese Werte kommen aus deiner .env Datei (lokal) oder den Vercel Settings (online)
-const ENV_HOST = import.meta.env.VITE_DB_HOST || '';
-const ENV_SCHEMA = import.meta.env.VITE_DB_SCHEMA || '';
-const ENV_USER = import.meta.env.VITE_DB_USER || '';
-const ENV_PASS = import.meta.env.VITE_DB_PASSWORD || '';
-
-
-
-
 // --- 1. STATES ---
-//const serverName = ref('https://localhost'); 
-//const dbName = ref(''); 
-// const credentials = reactive({ username: '', password: '' });
-const serverName = ref(ENV_HOST); 
-const dbName = ref(ENV_SCHEMA);
-const credentials = reactive({ username: ENV_USER, password: ENV_PASS });
-
-
+const serverName = ref('https://localhost'); 
+const dbName = ref(''); 
 const schemataListe = ref([]);
 const isLoadingSchemata = ref(false); 
 const isLoggedIn = ref(false); 
 const isLoggingIn = ref(false);
+const credentials = reactive({ username: '', password: '' });
 const klassenListe = ref([]); 
 const selectedKlasse = ref(null); 
 const selectedSchueler = ref(null);
@@ -35,7 +20,99 @@ const previewImage = ref(null);
 const deleteModal = reactive({ show: false, schueler: null });
 const toast = ref({ show: false, message: '', type: 'info' });
 const uploadStatus = reactive({ active: false, current: 0, total: 0 });
+const loginError = ref('');
+const canLogin = computed(() =>
+  !isLoggingIn.value &&
+  serverTest.ok === true &&
+  schemataListe.value.length > 0 &&
+  !!dbName.value
+);
+const serverTest = reactive({
+  running: false,
+  ok: null,          // true/false/null
+  title: '',
+  details: ''
+});
 
+function isIpAddress(hostname) {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
+}
+
+function analyzeServerUrl(url) {
+  try {
+    const parsed = new URL(url.trim());
+    const hostname = parsed.hostname;
+
+    return {
+      isHttps: parsed.protocol === 'https:',
+      hostname,
+      isIp: isIpAddress(hostname),
+    };
+  } catch {
+    return null; // ungültige URL
+  }
+}
+
+function formatAxiosError(err) {
+  if (err?.response) {
+    const status = err.response.status;
+    return {
+      kind: 'http',
+      title: `Server antwortet, aber mit Fehler (${status})`,
+      details:
+        status === 401 || status === 403
+          ? 'Der Server ist erreichbar, aber Login/Authentifizierung ist fehlgeschlagen (Benutzer/Passwort prüfen).'
+          : 'Der Server ist erreichbar, aber der angefragte Endpunkt liefert einen Fehler.'
+    };
+  }
+
+  if (err?.request) {
+    return {
+      kind: 'network',
+      title: 'Keine Antwort vom Server',
+      details:
+        'Der Server ist nicht erreichbar oder die Verbindung wird blockiert (Netzwerk, Firewall, VPN, DNS oder Zertifikat).'
+    };
+  }
+
+  return {
+    kind: 'unknown',
+    title: 'Unbekannter Fehler',
+    details: String(err?.message ?? err)
+  };
+}
+
+function formatLoginError(err) {
+  if (err?.response) {
+    const s = err.response.status;
+    if (s === 401 || s === 403) return 'Benutzername oder Passwort falsch (oder keine Berechtigung).';
+    if (s === 404) return 'API-Endpunkt nicht gefunden (Serveradresse/Port prüfen).';
+    return `Serverfehler (${s}). Bitte später erneut versuchen.`;
+  }
+
+  // Netzwerk/TLS/DNS/Timeout
+  if (err?.code === 'ECONNABORTED') return 'Zeitüberschreitung. Server antwortet nicht rechtzeitig.';
+  if (err?.request) return 'Keine Verbindung möglich. Netzwerk, Firewall oder Zertifikat/Hostname prüfen.';
+
+  return 'Unbekannter Fehler beim Login.';
+}
+
+function showConnectionHintForServerUrl(url) {
+  const info = analyzeServerUrl(url);
+
+  if (!info) {
+    showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "info");
+    return;
+  }
+
+  // Kernhinweis: HTTPS + IP
+  if (info.isHttps && info.isIp) {
+    showToast(
+      "Hinweis: HTTPS mit IP-Adresse klappt oft nicht. Bitte den Rechnernamen verwenden (Zertifikat ist an den Namen gebunden).",
+      "info"
+    );
+  }
+}
 
 // Stelle sicher, dass dieses Objekt existiert!
 const camera = reactive({
@@ -48,6 +125,13 @@ const videoPlayer = ref(null);
 const captureCanvas = ref(null);
 
 // --- 2. COMPUTED ---
+watch(serverName, () => {
+  // sobald die URL geändert wird: alten Teststatus zurücksetzen
+  serverTest.ok = null;
+  serverTest.title = '';
+  serverTest.details = '';
+});
+
 const sortierteSchueler = computed(() => {
   if (!selectedKlasse.value?.schueler) return [];
   return [...selectedKlasse.value.schueler].sort((a,b) => a.nachname.localeCompare(b.nachname));
@@ -58,19 +142,123 @@ const anzahlBilderImPool = computed(() => {
 });
 
 // --- 3. API & AUTH ---
+async function testServerConnection() {
+  serverTest.running = true;
+  serverTest.ok = null;
+  serverTest.title = '';
+  serverTest.details = '';
+
+  const raw = serverName.value?.trim() ?? '';
+  const info = analyzeServerUrl(raw);
+
+  if (!info) {
+    serverTest.ok = false;
+    serverTest.title = 'Ungültige Server-Adresse';
+    serverTest.details = 'Bitte eine gültige URL eingeben (z. B. https://servername:3306).';
+    serverTest.running = false;
+    return;
+  }
+
+  // Klarer Hinweis: HTTPS + IP
+  if (info.isHttps && info.isIp) {
+    serverTest.ok = false;
+    serverTest.title = 'HTTPS mit IP-Adresse';
+    serverTest.details =
+      'HTTPS funktioniert meist nur mit Rechnernamen, da das Zertifikat an den Namen gebunden ist. ' +
+      'Bitte verwenden Sie den Hostnamen (z. B. https://SERVERNAME:3306) statt der IP.';
+    serverTest.running = false;
+    return;
+  }
+
+  // Test-Endpunkt: config/db/schemata (ohne Auth) – passt zu deiner App
+  // Falls dein Server das nur mit Auth liefert, testen wir danach noch mit Auth.
+  const base = raw.replace(/\/+$/, '');
+
+  // Timeout, damit es nicht ewig hängt
+  const client = axios.create({ timeout: 6000 });
+
+  try {
+    await client.get(`${base}/config/db/schemata`);
+    serverTest.ok = true;
+    serverTest.title = 'Server erreichbar';
+    serverTest.details = 'Die Verbindung funktioniert. Sie können jetzt Schema wählen und sich anmelden.';
+  } catch (err) {
+    // Wenn der Endpunkt Auth braucht: zweiter Versuch mit Basic Auth (falls eingegeben)
+    const first = formatAxiosError(err);
+
+    // Optionaler Retry mit Auth, falls Benutzer/Passwort schon eingetragen sind
+    const hasCreds = !!credentials.username && !!credentials.password;
+    if (hasCreds) {
+      try {
+        await client.get(`${base}/config/db/schemata`, { auth: credentials });
+        serverTest.ok = true;
+        serverTest.title = 'Server erreichbar (mit Login)';
+        serverTest.details = 'Der Server antwortet, wenn Benutzer/Passwort mitgesendet werden.';
+      } catch (err2) {
+        const second = formatAxiosError(err2);
+        serverTest.ok = false;
+        serverTest.title = second.title;
+        serverTest.details = second.details + '\n\nTipp: Wenn der Zugriff per Browser klappt, aber hier nicht, ist es oft ein Zertifikat-/Hostname-Thema.';
+      }
+    } else {
+      serverTest.ok = false;
+      serverTest.title = first.title;
+      serverTest.details =
+        first.details +
+        '\n\nTipp: Verwenden Sie für HTTPS bitte den Rechnernamen (nicht die IP).';
+    }
+  } finally {
+    serverTest.running = false;
+  }
+}
+
 async function ladeSchemata() {
   isLoadingSchemata.value = true;
+  const info = analyzeServerUrl(serverName.value);
+if (!info) {
+  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "danger");
+  isLoadingSchemata.value = false;
+  return;
+}
+if (info.isHttps && info.isIp) {
+  showToast(
+    "Verbindungshinweis: HTTPS mit IP-Adresse funktioniert meist nicht (Zertifikat passt zum Rechnernamen). Bitte den Hostnamen verwenden.",
+    "info"
+  );
+  // nicht abbrechen: Schemata können ggf. trotzdem gehen, aber meist scheitert TLS ohnehin
+}
+
   try {
     const base = serverName.value.trim().replace(/\/+$/, "");
     const res = await axios.get(`${base}/config/db/schemata`);
     schemataListe.value = res.data.map(i => typeof i === 'object' ? i.name : i);
     if (schemataListe.value.length > 0) dbName.value = schemataListe.value[0];
-  } catch (e) { showToast("Server nicht erreichbar", "danger"); } 
+  } catch (e) {
+  //showConnectionHintForServerUrl(serverName.value);
+  showToast("Server nicht erreichbar. Prüfe Servername und Netzwerk.", "danger");
+  } 
   finally { isLoadingSchemata.value = false; }
 }
 
 async function performLogin() {
   isLoggingIn.value = true;
+  loginError.value = '';
+
+  const info = analyzeServerUrl(serverName.value);
+if (!info) {
+  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "danger");
+  isLoggingIn.value = false;
+  return;
+}
+
+if (info.isHttps && info.isIp) {
+  showToast(
+    "Login abgebrochen: HTTPS mit IP-Adresse funktioniert meist nicht. Bitte den Rechnernamen verwenden (Zertifikat ist an den Namen gebunden).",
+    "danger"
+  );
+  isLoggingIn.value = false;
+  return;
+}
  
   zuordnungen.value = [];       // Löscht die Matches
   gefundeneBilder.value = {};   // Löscht den Bilderpool
@@ -86,7 +274,11 @@ async function performLogin() {
       selectedKlasse.value = klassenListe.value[0]; 
       await handleKlassenWechsel(); 
     }
-  } catch (e) { showToast("Login fehlgeschlagen", "danger"); } 
+  } catch (e) {
+  // Extra Hinweis, falls doch IP/HTTPS oder Zertifikat das Problem ist
+  showConnectionHintForServerUrl(serverName.value);
+  loginError.value = formatLoginError(e);
+} 
   finally { isLoggingIn.value = false; }
 }
 
@@ -141,6 +333,20 @@ function autoMatch() {
     showToast("Bilder-Pool ist leer. Bitte zuerst Fotos laden oder aufnehmen.", "info");
     return;
   }
+
+  // Login mit Enter-Taste auslösen
+  function tryLoginWithEnter() {
+  if (
+    isLoggingIn.value ||
+    serverTest.ok !== true ||
+    schemataListe.value.length === 0 ||
+    !dbName.value
+  ) {
+    return; // Login nicht erlaubt → nichts tun
+  }
+
+  performLogin();
+}
 
   sortierteSchueler.value.forEach(s => {
     // 1. Überspringen, wenn bereits zugeordnet (manuell oder auto)
