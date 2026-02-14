@@ -4,6 +4,9 @@ import axios from 'axios'
 import { scaleImage } from './imageUtils.js' // Die ausgelagerte Funktion
 
 // --- 1. STATES ---
+const LS_SERVER = 'sfm:lastServer';
+const LS_SCHEMA = 'sfm:lastSchema';
+
 const serverName = ref('https://localhost'); 
 const dbName = ref(''); 
 const schemataListe = ref([]);
@@ -17,7 +20,14 @@ const selectedSchueler = ref(null);
 const zuordnungen = ref([]); 
 const gefundeneBilder = ref({}); 
 const previewImage = ref(null);
-const deleteModal = reactive({ show: false, schueler: null });
+const deleteModal = reactive({
+  show: false,
+  mode: null,
+  titel: '',
+  nachricht: '',
+  bildName: null,
+  schueler: null
+});
 const toast = ref({ show: false, message: '', type: 'info' });
 const uploadStatus = reactive({ active: false, current: 0, total: 0 });
 const loginError = ref('');
@@ -32,6 +42,33 @@ const serverTest = reactive({
   ok: null,          // true/false/null
   title: '',
   details: ''
+});
+
+onMounted(() => {
+  const savedServer = localStorage.getItem(LS_SERVER);
+  if (savedServer) {
+    serverName.value = savedServer;
+  }
+});
+
+watch(serverName, (val) => {
+  // 1) sobald die URL geändert wird: alten Teststatus zurücksetzen
+  serverTest.ok = null;
+  serverTest.title = '';
+  serverTest.details = '';
+
+  // 2) Serveradresse merken (oder löschen)
+  const v = val?.trim();
+  if (v) {
+    localStorage.setItem(LS_SERVER, v);
+  } else {
+    localStorage.removeItem(LS_SERVER);
+  }
+});
+
+watch(dbName, (val) => {
+  if (val) localStorage.setItem(LS_SCHEMA, val);
+  else localStorage.removeItem(LS_SCHEMA);
 });
 
 function isIpAddress(hostname) {
@@ -97,22 +134,6 @@ function formatLoginError(err) {
   return 'Unbekannter Fehler beim Login.';
 }
 
-function showConnectionHintForServerUrl(url) {
-  const info = analyzeServerUrl(url);
-
-  if (!info) {
-    showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "info");
-    return;
-  }
-
-  // Kernhinweis: HTTPS + IP
-  if (info.isHttps && info.isIp) {
-    showToast(
-      "Hinweis: HTTPS mit IP-Adresse klappt oft nicht. Bitte den Rechnernamen verwenden (Zertifikat ist an den Namen gebunden).",
-      "info"
-    );
-  }
-}
 
 // Stelle sicher, dass dieses Objekt existiert!
 const camera = reactive({
@@ -125,12 +146,7 @@ const videoPlayer = ref(null);
 const captureCanvas = ref(null);
 
 // --- 2. COMPUTED ---
-watch(serverName, () => {
-  // sobald die URL geändert wird: alten Teststatus zurücksetzen
-  serverTest.ok = null;
-  serverTest.title = '';
-  serverTest.details = '';
-});
+
 
 const sortierteSchueler = computed(() => {
   if (!selectedKlasse.value?.schueler) return [];
@@ -276,7 +292,7 @@ if (info.isHttps && info.isIp) {
     }
   } catch (e) {
   // Extra Hinweis, falls doch IP/HTTPS oder Zertifikat das Problem ist
-  showConnectionHintForServerUrl(serverName.value);
+  //showConnectionHintForServerUrl(serverName.value);
   loginError.value = formatLoginError(e);
 } 
   finally { isLoggingIn.value = false; }
@@ -334,20 +350,6 @@ function autoMatch() {
     return;
   }
 
-  // Login mit Enter-Taste auslösen
-  function tryLoginWithEnter() {
-  if (
-    isLoggingIn.value ||
-    serverTest.ok !== true ||
-    schemataListe.value.length === 0 ||
-    !dbName.value
-  ) {
-    return; // Login nicht erlaubt → nichts tun
-  }
-
-  performLogin();
-}
-
   sortierteSchueler.value.forEach(s => {
     // 1. Überspringen, wenn bereits zugeordnet (manuell oder auto)
     if (zuordnungen.value.some(z => z.sId === s.id)) return;
@@ -387,6 +389,7 @@ function autoMatch() {
     }
   }
 }
+
 
 // --- 5. UPLOAD & DELETE ---
 async function uploadAllMatches() {
