@@ -13,10 +13,8 @@ table tr.selected-row { box-shadow: inset 6px 0 0 #0d6efd; }
   justify-content: center; font-size: 10px; font-weight: bold; 
   border: 2px solid white; 
 }
-.floating-badge { position: absolute; top: -5px; left: -5px; z-index: 5; }
 
 /* Interaktionen */
-.preview-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; }
 .preview-btn:hover { background: #e9ecef; color: #0d6efd; transform: scale(1.1); }
 
 /* Overlays */
@@ -52,25 +50,8 @@ table tr.selected-row { box-shadow: inset 6px 0 0 #0d6efd; }
 }
 
 
-.glass-backdrop {
-  background: rgba(15, 23, 42, 0.6) !important;
-  backdrop-filter: blur(8px);
-}
 
-/* Container für das Bild */
-.preview-image-container {
-  background-color: #f8f9fa;
-  display: inline-block;
-  line-height: 0;
-}
 
-.portrait-preview {
-  max-height: 60vh;
-  min-width: 200px;
-  object-fit: contain;
-  /* Verhindert Pixelbildung bei kleinen Originalbildern */
-  image-rendering: high-quality; 
-}
 
 /* Sanftes Einblenden des Modals */
 .modal.show .modal-content {
@@ -83,21 +64,9 @@ table tr.selected-row { box-shadow: inset 6px 0 0 #0d6efd; }
 }
 
 
-.portrait-preview-small {
-  /* Wir zeigen es etwas größer als 119px an (ca. Faktor 1.5) 
-     damit man Details sieht, aber nicht so groß, dass es verpixelt */
-  width: 180px; 
-  height: auto;
-  display: block;
-  object-fit: contain;
-  /* Knackige Darstellung auch bei kleinen Bildern */
-  image-rendering: -webkit-optimize-contrast;
-}
 
-.glass-backdrop {
-  background: rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(4px);
-}
+
+
 
 /* Modal-Größe für sm erzwingen, falls Bootstrap-Standard zu breit */
 .modal-sm {
@@ -116,20 +85,7 @@ table tr.selected-row { box-shadow: inset 6px 0 0 #0d6efd; }
     pointer-events: none;
 }
 
-/* Der Standard-Kreis (mit Match) */
-.match-circle {
-    width: 26px;
-    height: 26px;
-    background-color: #0d6efd;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-weight: bold;
-    transition: all 0.2s ease;
-}
+
 
 /* Der leere Kreis (Platzhalter) */
 .circle-empty {
@@ -167,4 +123,116 @@ tr:hover .circle-empty {
   min-width: 600px;   /* 🔴 wichtig */
 
   margin: 0 auto;
+}
+
+
+/* Animation für Server-Manager */
+.server-manager-enter-active,
+.server-manager-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.server-manager-enter-from,
+.server-manager-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.server-manager-enter-to,
+.server-manager-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dünnere Kamera-Slider */
+/* Basis dünner Slider */
+.form-range-thin {
+  height: 1rem;
+}
+
+/* Webkit (Chrome / Edge / Electron) */
+.form-range-thin::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #444;
+  border-radius: 4px;
+}
+
+.form-range-thin::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #0d6efd; /* Bootstrap Primary */
+  border-radius: 50%;
+  border: none;
+  margin-top: -5px;
+  cursor: pointer;
+}
+
+/* Aktive Spur (gefüllter Bereich links vom Thumb) */
+.form-range-thin::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    #0d6efd 0%,
+    #0d6efd var(--range-progress, 50%),
+    #444 var(--range-progress, 50%),
+    #444 100%
+  );
+}
+
+/* Firefox */
+.form-range-thin::-moz-range-track {
+  height: 4px;
+  background: #444;
+  border-radius: 4px;
+}
+
+.form-range-thin::-moz-range-progress {
+  background-color: #0d6efd;
+  height: 4px;
+  border-radius: 4px;
+}
+
+.form-range-thin::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #0d6efd;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+.preview-backdrop { z-index: 3000 !important; }
+.preview-modal { z-index: 3001 !important; }
+
+.preview-frame{
+  background: #f3f5f7;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.preview-img{
+  max-height: 70vh;
+  width: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+}
+
+/* Sicherstellen, dass Preview immer über allem liegt */
+.preview-backdrop { z-index: 3000 !important; }
+.preview-modal { z-index: 3001 !important; }
+
+.icon-strike {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 2px;
+  background-color: #565152; /* Bootstrap danger */
+  transform: rotate(45deg);
+  pointer-events: none;
 }

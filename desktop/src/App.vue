@@ -4,11 +4,24 @@ import axios from 'axios'
 import { scaleImage } from './imageUtils.js' // Die ausgelagerte Funktion
 
 // --- 1. STATES ---
-const LS_SERVER = 'sfm:lastServer';
+const LS_SERVERS = 'sfm:recentServers';
+const MAX_SERVERS = 8;
+const AUTO_UPLOAD_LIVE = true;
+const fileInput = ref(null);
+const recentServers = ref([]);
+//const serverSaved = ref(false);
+const selectedServer = ref('');
+const showServerManager = ref(false);
+const canEditSchueler = ref(null); // null = unbekannt, true/false = bekannt
+
+
+
+
 const LS_SCHEMA = 'sfm:lastSchema';
 
 const serverName = ref('https://localhost'); 
 const dbName = ref(''); 
+const loggedInUser = ref('');
 const schemataListe = ref([]);
 const isLoadingSchemata = ref(false); 
 const isLoggedIn = ref(false); 
@@ -28,15 +41,36 @@ const deleteModal = reactive({
   bildName: null,
   schueler: null
 });
+const infoModal = reactive({
+  show: false,
+  titel: '',
+  html: ''
+});
+
+
 const toast = ref({ show: false, message: '', type: 'info' });
 const uploadStatus = reactive({ active: false, current: 0, total: 0 });
 const loginError = ref('');
-const canLogin = computed(() =>
-  !isLoggingIn.value &&
-  serverTest.ok === true &&
-  schemataListe.value.length > 0 &&
-  !!dbName.value
+
+const camAdjust = reactive({
+  zoom: 1.0,        // 1.00 - 2.00
+  brightness: 100,  // 50 - 150
+  contrast: 100,    // 50 - 150
+  saturate: 100     // 0 - 200
+});
+
+function resetCamAdjust() {
+  camAdjust.zoom = 1.0;
+  camAdjust.brightness = 100;
+  camAdjust.contrast = 100;
+  camAdjust.saturate = 100;
+}
+
+const previewFilterCss = computed(() =>
+  `brightness(${camAdjust.brightness}%) contrast(${camAdjust.contrast}%) saturate(${camAdjust.saturate}%)`
 );
+
+
 const serverTest = reactive({
   running: false,
   ok: null,          // true/false/null
@@ -45,31 +79,136 @@ const serverTest = reactive({
 });
 
 onMounted(() => {
-  const savedServer = localStorage.getItem(LS_SERVER);
-  if (savedServer) {
-    serverName.value = savedServer;
+  const saved = localStorage.getItem(LS_SERVERS);
+  if (saved) {
+    try {
+      recentServers.value = JSON.parse(saved) || [];
+    } catch {
+      recentServers.value = [];
+    }
+  }
+
+  // optional: zuletzt gemerkten Eintrag direkt ins Feld setzen
+  if (recentServers.value.length > 0 && !serverName.value) {
+    serverName.value = recentServers.value[0];
   }
 });
 
-watch(serverName, (val) => {
-  // 1) sobald die URL geändert wird: alten Teststatus zurücksetzen
+
+
+watch(serverName, () => {
+  // sobald die URL geändert wird: alten Teststatus zurücksetzen
   serverTest.ok = null;
   serverTest.title = '';
   serverTest.details = '';
-
-  // 2) Serveradresse merken (oder löschen)
-  const v = val?.trim();
-  if (v) {
-    localStorage.setItem(LS_SERVER, v);
-  } else {
-    localStorage.removeItem(LS_SERVER);
-  }
 });
+
+watch(selectedServer, (val) => {
+  if (val) serverName.value = val;
+});
+
 
 watch(dbName, (val) => {
   if (val) localStorage.setItem(LS_SCHEMA, val);
   else localStorage.removeItem(LS_SCHEMA);
 });
+
+
+
+
+function findAnySchuelerId() {
+  for (const k of (klassenListe.value ?? [])) {
+    const s = k?.schueler?.[0];
+    if (s?.id != null) return s.id;
+  }
+  return null;
+}
+
+async function checkSchuelerEditPermission() {
+  canEditSchueler.value = null;
+
+  const testId = findAnySchuelerId();
+  if (!testId) {
+    // keine Schüler vorhanden → Rechte nicht testbar
+    canEditSchueler.value = null;
+    return;
+  }
+
+  try {
+    // Leerer PATCH: Wenn keine Rechte -> 403.
+    // Wenn Rechte ok -> meist 400/415/etc. (weil Body leer/ungültig)
+    await axios.patch(`/schueler/${testId}/stammdaten`, {});
+    
+    // Falls Server das sogar akzeptiert: dann definitiv Rechte vorhanden
+    canEditSchueler.value = true;
+
+  } catch (err) {
+    const status = err?.response?.status;
+
+    if (status === 403) {
+      canEditSchueler.value = false;
+      return;
+    }
+    if (status === 400 || status === 415 || status === 422) {
+      canEditSchueler.value = true;
+      return;
+    }
+    if (status === 404) {
+      canEditSchueler.value = null;
+      return;
+    }
+
+    // Netzwerk / sonstiges
+    canEditSchueler.value = null;
+  }
+}
+
+
+
+function rememberServer() {
+  const v = serverName.value?.trim();
+  if (!v) return;
+
+  // Duplikate entfernen, neueste nach vorne
+  recentServers.value = recentServers.value.filter(s => s !== v);
+  recentServers.value.unshift(v);
+
+  if (recentServers.value.length > MAX_SERVERS) {
+    recentServers.value.length = MAX_SERVERS;
+  }
+
+  localStorage.setItem(LS_SERVERS, JSON.stringify(recentServers.value));
+
+  // ✔️ kurz anzeigen
+  serverSaved.value = true;
+  setTimeout(() => {
+    serverSaved.value = false;
+  }, 1200);
+  selectedServer.value = serverName.value.trim();
+
+}
+
+function removeSelectedServer() {
+  const s = selectedServer.value;
+  if (!s) return;
+
+  recentServers.value = recentServers.value.filter(x => x !== s);
+  localStorage.setItem(LS_SERVERS, JSON.stringify(recentServers.value));
+
+  selectedServer.value = '';
+  if ((serverName.value?.trim() ?? '') === s) serverName.value = '';
+}
+
+
+async function connectServer() {
+  await testServerConnection();
+  if (serverTest.ok === true) {
+    await ladeSchemata();
+  }
+}
+
+
+
 
 function isIpAddress(hostname) {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
@@ -89,6 +228,8 @@ function analyzeServerUrl(url) {
     return null; // ungültige URL
   }
 }
+
+
 
 function formatAxiosError(err) {
   if (err?.response) {
@@ -143,10 +284,8 @@ const camera = reactive({
 });
 
 const videoPlayer = ref(null);
-const captureCanvas = ref(null);
 
 // --- 2. COMPUTED ---
-
 
 const sortierteSchueler = computed(() => {
   if (!selectedKlasse.value?.schueler) return [];
@@ -170,7 +309,7 @@ async function testServerConnection() {
   if (!info) {
     serverTest.ok = false;
     serverTest.title = 'Ungültige Server-Adresse';
-    serverTest.details = 'Bitte eine gültige URL eingeben (z. B. https://servername:3306).';
+    serverTest.details = 'Bitte eine gültige URL eingeben (z. B. https://servername:8443).';
     serverTest.running = false;
     return;
   }
@@ -181,7 +320,7 @@ async function testServerConnection() {
     serverTest.title = 'HTTPS mit IP-Adresse';
     serverTest.details =
       'HTTPS funktioniert meist nur mit Rechnernamen, da das Zertifikat an den Namen gebunden ist. ' +
-      'Bitte verwenden Sie den Hostnamen (z. B. https://SERVERNAME:3306) statt der IP.';
+      'Bitte verwenden Sie den Hostnamen (z. B. https://SERVERNAME:8443) statt der IP.';
     serverTest.running = false;
     return;
   }
@@ -232,7 +371,7 @@ async function ladeSchemata() {
   isLoadingSchemata.value = true;
   const info = analyzeServerUrl(serverName.value);
 if (!info) {
-  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "danger");
+  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:8443).", "danger");
   isLoadingSchemata.value = false;
   return;
 }
@@ -262,7 +401,7 @@ async function performLogin() {
 
   const info = analyzeServerUrl(serverName.value);
 if (!info) {
-  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:3306).", "danger");
+  showToast("Bitte eine gültige Server-Adresse eingeben (z. B. https://servername:8443).", "danger");
   isLoggingIn.value = false;
   return;
 }
@@ -283,13 +422,33 @@ if (info.isHttps && info.isIp) {
     const base = serverName.value.trim().replace(/\/+$/, "");
     axios.defaults.baseURL = `${base}/db/${dbName.value}`;
     axios.defaults.auth = credentials;
+    
+    
     const res = await axios.get('/klassen/abschnitt/01');
-    klassenListe.value = res.data; 
-    isLoggedIn.value = true;
-    if (klassenListe.value.length > 0) { 
-      selectedKlasse.value = klassenListe.value[0]; 
-      await handleKlassenWechsel(); 
-    }
+
+// nach "sortierung" sortieren (robust gegen null/undefined)
+klassenListe.value = (Array.isArray(res.data) ? res.data : [])
+  .slice()
+  .sort((a, b) => {
+    const sa = Number.isFinite(Number(a?.sortierung)) ? Number(a.sortierung) : 9999;
+    const sb = Number.isFinite(Number(b?.sortierung)) ? Number(b.sortierung) : 9999;
+    if (sa !== sb) return sa - sb;
+
+    // optionaler Tie-Breaker: nach Kürzel
+    return String(a?.kuerzel ?? '').localeCompare(String(b?.kuerzel ?? ''), 'de');
+  });
+
+isLoggedIn.value = true;
+loggedInUser.value = credentials.username;
+
+// User-Rechte prüfen
+await checkSchuelerEditPermission();
+
+if (klassenListe.value.length > 0) {
+  selectedKlasse.value = klassenListe.value[0];
+  await handleKlassenWechsel();
+}
+
   } catch (e) {
   // Extra Hinweis, falls doch IP/HTTPS oder Zertifikat das Problem ist
   //showConnectionHintForServerUrl(serverName.value);
@@ -298,17 +457,45 @@ if (info.isHttps && info.isIp) {
   finally { isLoggingIn.value = false; }
 }
 
+function guessImageMimeFromBase64(b64) {
+  if (!b64) return 'image/jpeg';
+  // einfache Signatur-Erkennung
+  if (b64.startsWith('/9j/')) return 'image/jpeg';   // JPEG
+  if (b64.startsWith('iVBOR')) return 'image/png';   // PNG
+  if (b64.startsWith('R0lGOD')) return 'image/gif';  // GIF
+  return 'image/jpeg';
+}
+
+
 async function handleKlassenWechsel() {
   if (!selectedKlasse.value) return;
-  const schuelerArray = selectedKlasse.value.schueler;
+
+  const schuelerArray = selectedKlasse.value.schueler ?? [];
+
   for (let s of schuelerArray) {
-    try { 
-      const r = await axios.get(`/schueler/${s.id}/stammdaten`); 
-      s.hatFoto = !!(r.data.foto && r.data.foto.length > 0); 
-    } catch { s.hatFoto = false; }
+    try {
+      const r = await axios.get(`/schueler/${s.id}/stammdaten`);
+      const fotoB64 = r?.data?.foto || '';
+
+      s.hatFoto = fotoB64.length > 0;
+
+      // ✅ NEU: direkt als Data-URL am Schüler ablegen (für Thumbnail in Tabelle)
+      if (s.hatFoto) {
+        const mime = guessImageMimeFromBase64(fotoB64);
+        s.dbFotoUrl = `data:${mime};base64,${fotoB64}`;
+      } else {
+        s.dbFotoUrl = null;
+      }
+
+    } catch {
+      s.hatFoto = false;
+      s.dbFotoUrl = null;
+    }
   }
+
   // autoMatch();
 }
+
 
 // --- 4. BILD-HANDLING & MATCHING ---
 function handleFolderUpload(e) {
@@ -319,6 +506,7 @@ function handleFolderUpload(e) {
     }
   });
   showToast(`${Object.keys(gefundeneBilder.value).length} Bilder geladen`);
+  e.target.value = '';
 }
 
 function handleSchuelerKlick(s) {
@@ -395,61 +583,102 @@ function autoMatch() {
 async function uploadAllMatches() {
   if (zuordnungen.value.length === 0) return;
 
-  // Initialisierung des Status-Overlays
-  uploadStatus.active = true; 
+  uploadStatus.active = true;
   uploadStatus.total = zuordnungen.value.length;
   uploadStatus.current = 0;
-  
+
   let erfolge = 0;
-  let fehler = 0;
+  const errors = [];
+  const successIds = new Set();
 
-  // Wir arbeiten mit einer Kopie, um das Original-Array während des Prozesses zu leeren
-  const matchesToUpload = [...zuordnungen.value];
+  const matchesToUpload = zuordnungen.value.slice();
+  const schuelerById = new Map((selectedKlasse.value?.schueler ?? []).map(s => [s.id, s]));
 
-  for (let z of matchesToUpload) {
-    try {
-      uploadStatus.current++;
+  try {
+    for (let i = 0; i < matchesToUpload.length; i++) {
+      const z = matchesToUpload[i];
+      uploadStatus.current = i + 1;
 
-      // 1. Bild aus dem Pool holen
-      const bildDaten = gefundeneBilder.value[z.bild];
-      if (!bildDaten) throw new Error("Bild nicht mehr im Pool");
+      try {
+        const bildDaten = gefundeneBilder.value[z.bild];
+        if (!bildDaten?.url) throw new Error("Bild nicht mehr im Pool");
 
-      // 2. Skalieren (exakt 119x160 für SVWS)
-      const scaledDataUrl = await scaleImage(bildDaten.url, 119, 160);
-      
-      // 3. Base64-Teil extrahieren
-      const base64String = scaledDataUrl.split(',')[1];
+        const scaledDataUrl = await scaleImage(bildDaten.url, 119, 160);
+        const base64String = scaledDataUrl.split(',')[1];
+        if (!base64String) throw new Error("Skalierung lieferte kein Base64");
 
-      // 4. API-Request (PATCH für Teil-Update der Stammdaten)
-      await axios.patch(`/schueler/${z.sId}/stammdaten`, { 
-        foto: base64String 
-      });
+        await axios.patch(`/schueler/${z.sId}/stammdaten`, { foto: base64String });
 
-      // 5. UI im Hintergrund aktualisieren (Blauer Kamera-Icon)
-      const schueler = selectedKlasse.value?.schueler.find(s => s.id === z.sId);
-      if (schueler) schueler.hatFoto = true;
+        const schueler = schuelerById.get(z.sId);
+if (schueler) {
+  schueler.hatFoto = true;
 
-      // 6. Aus der Zuordnungsliste entfernen (bei Erfolg)
-      zuordnungen.value = zuordnungen.value.filter(item => item.sId !== z.sId);
-      erfolge++;
+  // ✅ NEU: sofort Thumbnail setzen (scaledDataUrl ist schon data:image/...;base64,...)
+  // Falls scaleImage kein "data:image/.." Prefix liefert, fallback auf jpeg:
+  schueler.dbFotoUrl = scaledDataUrl.startsWith('data:')
+    ? scaledDataUrl
+    : `data:image/jpeg;base64,${base64String}`;
+}
 
-    } catch (err) {
-      console.error(`Fehler bei ID ${z.sId}:`, err);
-      fehler++;
+
+        successIds.add(z.sId);
+        erfolge++;
+
+      } catch (err) {
+        // ✅ HIER: 403 => Abbruch
+        if (err?.response?.status === 403) {
+          throw new Error("NO_PERMISSION_ABORT");
+        }
+
+        // normale Fehler sammeln
+        let msg = "Unbekannter Fehler";
+        if (err?.response?.status === 404) msg = `Schüler mit ID ${z.sId} wurde nicht gefunden.`;
+        else if (err?.response?.data?.message) msg = err.response.data.message;
+        else if (err?.message) msg = err.message;
+
+        console.error(`Fehler bei ID ${z.sId}:`, err);
+        errors.push({ sId: z.sId, bild: z.bild, message: msg });
+      }
     }
-  }
 
-  // Abschluss-Feedback
-  uploadStatus.active = false;
-  
-  if (fehler === 0) {
-    showToast(`${erfolge} Fotos erfolgreich übertragen!`, 'success');
-  } else if (erfolge > 0) {
-    showToast(`${erfolge} erfolgreich, ${fehler} fehlgeschlagen.`, 'info');
-  } else {
-    showToast("Upload komplett fehlgeschlagen. Prüfen Sie die Verbindung.", 'danger');
+    if (successIds.size > 0) {
+      zuordnungen.value = zuordnungen.value.filter(item => !successIds.has(item.sId));
+    }
+
+    // Abschlussmeldung
+    if (errors.length === 0) showToast(`${erfolge} Foto(s) erfolgreich hochgeladen.`, "success");
+    else showToast(`${erfolge} erfolgreich, ${errors.length} fehlgeschlagen.`, "danger");
+
+  } catch (e) {
+    // ✅ HIER: Abbruchmeldung für 403
+    if (e?.message === "NO_PERMISSION_ABORT") {
+      showToast("Upload abgebrochen: Der SVWS-Benutzer hat keine Rechte, um Schülerdaten zu ändern (403).", "danger");
+    } else {
+      console.error("Upload abgebrochen:", e);
+      showToast("Upload abgebrochen (unerwarteter Fehler).", "danger");
+    }
+  } finally {
+    uploadStatus.active = false;
   }
 }
+
+async function uploadFotoForSchueler(sId, dataUrl119x160) {
+  const base64String = dataUrl119x160.split(',')[1];
+  if (!base64String) throw new Error("Skalierung lieferte kein Base64");
+
+  try {
+    await axios.patch(`/schueler/${sId}/stammdaten`, { foto: base64String });
+    return { ok: true };
+  } catch (err) {
+    const status = err?.response?.status;
+
+    if (status === 403) return { ok: false, code: 403, message: "Keine Rechte, um Schülerdaten zu ändern." };
+    if (status === 404) return { ok: false, code: 404, message: `Schüler mit ID ${sId} nicht gefunden.` };
+
+    return { ok: false, code: status ?? 0, message: err?.message ?? "Upload fehlgeschlagen." };
+  }
+}
+
 
 
 async function executeDelete() {
@@ -461,13 +690,15 @@ async function executeDelete() {
       const s = deleteModal.schueler;
       await axios.patch(`/schueler/${s.id}/stammdaten`, { foto: "" });
       
-      s.hatFoto = false; // Icon in der Liste aktualisieren
+      s.hatFoto = false;  
+      s.dbFotoUrl = null; // Icon in der Liste aktualisieren
       showToast(`Foto von ${s.vorname} ${s.nachname} gelöscht`, "success");
     } 
     else if (mode === 'pool') {
       // --- DEN GESAMTEN BILDER-POOL LEEREN ---
       gefundeneBilder.value = {};
       zuordnungen.value = [];
+      if (fileInput.value) fileInput.value.value = '';
       showToast("Bilder-Pool geleert", "info");
     } 
     else if (mode === 'einzelbild') {
@@ -487,12 +718,16 @@ async function executeDelete() {
   }
 }
 // --- 6. VORSCHAU & HELPER ---
-function previewLocalImage(name, url) { previewImage.value = { url, name }; }
-
+function previewLocalImage(name, url) {
+  previewImage.value = { name, url };
+}
 async function fetchAndShowDBFoto(s) { 
   try {
     const r = await axios.get(`/schueler/${s.id}/stammdaten`); 
-    previewImage.value = { url: `data:image/jpeg;base64,${r.data.foto}`, name: `${s.vorname} ${s.nachname}` }; 
+    const fotoB64 = r?.data?.foto || '';
+const mime = guessImageMimeFromBase64(fotoB64);
+previewImage.value = { url: `data:${mime};base64,${fotoB64}`, name: `${s.vorname} ${s.nachname}` };
+
   } catch { showToast("Fehler beim Laden", "danger"); }
 }
 
@@ -515,30 +750,51 @@ const getMatchInfo = (n) => {
 async function startCamera(s) {
   camera.schueler = s;
   camera.active = true;
-  
+  resetCamAdjust();
+
   try {
-    // Fragt den Browser nach Erlaubnis für die Kamera
-    camera.stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        width: { ideal: 1280 }, 
-        height: { ideal: 720 }, 
-        facingMode: "user" 
-      } 
-    });
-    
-    // Kurze Verzögerung, damit Vue das Video-Element im Modal erst rendern kann
-    setTimeout(() => {
-      if (videoPlayer.value) {
-        videoPlayer.value.srcObject = camera.stream;
+    const targetAR = 119 / 160; // ~0.74375 (Portrait)
+
+    // Wichtig: wenn schon ein Stream läuft -> stoppen
+    if (camera.stream) {
+      camera.stream.getTracks().forEach(t => t.stop());
+      camera.stream = null;
+    }
+
+    // Portrait-Constraints: verringert Pillarboxing stark
+    const constraints = {
+      video: {
+        facingMode: "user",
+        aspectRatio: { ideal: targetAR },
+        width: { ideal: 960 },   // Portrait-ish, ausreichend scharf
+        height: { ideal: 1280 }, // Portrait-ish
+        // optional: frameRate: { ideal: 30 }
       }
-    }, 200);
-    
+    };
+
+    camera.stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    // Warten bis Video-Metadaten da sind (zuverlässiger als setTimeout)
+    await new Promise((resolve, reject) => {
+      const el = videoPlayer.value;
+      if (!el) return resolve();
+
+      el.onloadedmetadata = () => resolve();
+      el.onerror = (e) => reject(e);
+
+      el.srcObject = camera.stream;
+      // iOS/Safari: play() nötig; in Electron meistens ok
+      const p = el.play?.();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    });
+
   } catch (err) {
     console.error("Kamera-Fehler:", err);
     showToast("Kamera konnte nicht gestartet werden. Prüfe die Berechtigungen.", "danger");
     camera.active = false;
   }
 }
+
 
 function stopCamera() {
   if (camera.stream) {
@@ -553,80 +809,166 @@ function stopCamera() {
 // --- 7. KAMERA-LOGIK ---
 
 async function capturePhoto() {
-  if (!videoPlayer.value || !captureCanvas.value || !camera.schueler) return;
-
-  const video = videoPlayer.value;
-  const canvas = captureCanvas.value;
-  const context = canvas.getContext('2d');
-  const s = camera.schueler;
-
-  // --- KLASSEN-RETTUNG ---
-  let klassenName = '00';
-  if (selectedKlasse.value && selectedKlasse.value.kuerzel) {
-    klassenName = selectedKlasse.value.kuerzel.replace(/\s+/g, '_');
-  }
-
-  // --- AUFLÖSUNG & SCHNITT ---
-  const factor = 3;
-  canvas.width = 119 * factor;
-  canvas.height = 160 * factor;
-
-  const sourceWidth = video.videoWidth;
-  const sourceHeight = video.videoHeight;
-  const sourceAspect = sourceWidth / sourceHeight;
-  const targetAspect = 119 / 160;
-
-  let drawWidth, drawHeight, offsetX, offsetY;
-  if (sourceAspect > targetAspect) {
-    drawWidth = sourceHeight * targetAspect;
-    drawHeight = sourceHeight;
-    offsetX = (sourceWidth - drawWidth) / 2;
-    offsetY = 0;
-  } else {
-    drawWidth = sourceWidth;
-    drawHeight = sourceWidth / targetAspect;
-    offsetX = 0;
-    offsetY = (sourceHeight - drawHeight) / 2;
-  }
-
-  // Bild zeichnen
-  context.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
-  
-  const imageData = canvas.toDataURL('image/jpeg', 0.9);
-  const response = await fetch(imageData);
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
-    
-  const saubererName = s.nachname.replace(/\s+/g, '_');
-  const saubererVorname = s.vorname.replace(/\s+/g, '_');
-  const dateiName = `${klassenName}_${saubererName}_${saubererVorname}_${s.id}.jpg`;
-  
-  // 1. Bild im Pool speichern/überschreiben
-  gefundeneBilder.value[dateiName] = { 
-    url: blobUrl,
-    isLive: true 
-  };
-  
-  // 2. LOGIK: Existiert bereits ein Match für diesen Schüler?
-  const bestehenderMatchIndex = zuordnungen.value.findIndex(z => z.sId === s.id);
-
-  if (bestehenderMatchIndex !== -1) {
-    // Vorhandenen Match aktualisieren (verhindert Erhöhung der Anzahl)
-    zuordnungen.value[bestehenderMatchIndex].bild = dateiName;
-    zuordnungen.value[bestehenderMatchIndex].reason = 'Live (Update)';
-    showToast(`Foto für ${s.vorname} aktualisiert`, 'info');
-  } else {
-    // Neuen Match hinzufügen
-    zuordnungen.value.push({ 
-      sId: s.id, 
-      bild: dateiName, 
-      reason: 'Live' 
-    });
-    showToast(`Foto für ${s.vorname} erstellt`, 'success');
-  }
-
-  stopCamera();
+  if (canEditSchueler.value !== true) {
+  showToast("Keine Berechtigung.", "danger");
+  return;
 }
+
+  try {
+    const video = videoPlayer.value;
+    const s = camera.schueler;
+    if (!video || !s) return;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      showToast("Kamera ist noch nicht bereit.", "danger");
+      return;
+    }
+
+    const factor = 3;
+    const outW = 119 * factor;
+    const outH = 160 * factor;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // bessere Downscale-Qualität
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const targetAR = outW / outH;
+    const videoAR = vw / vh;
+
+    let sx, sy, sW, sH;
+
+    // Center-Crop auf Ziel-Seitenverhältnis (cover)
+    if (videoAR > targetAR) {
+      // Video zu breit → links/rechts weg
+      sH = vh;
+      sW = vh * targetAR;
+      sx = (vw - sW) / 2;
+      sy = 0;
+    } else {
+      // Video zu hoch → oben/unten weg
+      sW = vw;
+      sH = vw / targetAR;
+      sx = 0;
+      sy = (vh - sH) / 2;
+    }
+
+    // Zoom (zentriert)
+    const z = Math.max(1, Number(camAdjust?.zoom ?? 1));
+    const newSW = sW / z;
+    const newSH = sH / z;
+
+    sx = sx + (sW - newSW) / 2;
+    sy = sy + (sH - newSH) / 2;
+    sW = newSW;
+    sH = newSH;
+
+    // Rundung + Clamp (verhindert 1px-Ränder & OOB)
+    sx = Math.max(0, Math.round(sx));
+    sy = Math.max(0, Math.round(sy));
+    sW = Math.max(1, Math.min(vw - sx, Math.round(sW)));
+    sH = Math.max(1, Math.min(vh - sy, Math.round(sH)));
+
+    // Filter anwenden
+    const b = Number(camAdjust?.brightness ?? 100);
+    const c = Number(camAdjust?.contrast ?? 100);
+    const sat = Number(camAdjust?.saturate ?? 100);
+    ctx.filter = `brightness(${b}%) contrast(${c}%) saturate(${sat}%)`;
+
+    // Draw
+    ctx.clearRect(0, 0, outW, outH);
+    ctx.drawImage(video, sx, sy, sW, sH, 0, 0, outW, outH);
+
+    // DataURL für direkten Upload (enthält bereits data:image/jpeg;base64,...)
+    const dataUrlForUpload = canvas.toDataURL('image/jpeg', 0.9);
+
+    // Filter zurücksetzen (optional)
+    ctx.filter = 'none';
+
+    // Blob für lokalen Pool (blob: URL)
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    );
+
+    if (!blob) {
+      showToast("Foto konnte nicht erzeugt werden.", "danger");
+      return;
+    }
+
+    const blobUrl = URL.createObjectURL(blob);
+
+    const sanitize = (x) => String(x ?? '').trim().replace(/\s+/g, '_');
+    const klassenName = sanitize(selectedKlasse.value?.kuerzel || '00');
+    const dateiName =
+      `${klassenName}_${sanitize(s.nachname)}_${sanitize(s.vorname)}_${s.id}.jpg`;
+
+    // Bild im Pool speichern/überschreiben (Backup + Vorschau)
+    gefundeneBilder.value[dateiName] = { url: blobUrl, isLive: true };
+
+    // Match setzen/aktualisieren (Fallback, falls Upload fehlschlägt)
+    const idx = zuordnungen.value.findIndex(z => z.sId === s.id);
+    if (idx !== -1) {
+      zuordnungen.value[idx].bild = dateiName;
+      zuordnungen.value[idx].reason = 'Live (Update)';
+    } else {
+      zuordnungen.value.push({ sId: s.id, bild: dateiName, reason: 'Live' });
+    }
+
+    // ✅ Direkt-Upload von Live-Fotos (wenn aktiviert)
+    if (AUTO_UPLOAD_LIVE === true) {
+      uploadStatus.active = true;
+      uploadStatus.total = 1;
+      uploadStatus.current = 1;
+
+      const result = await uploadFotoForSchueler(s.id, dataUrlForUpload);
+
+      uploadStatus.active = false;
+
+      if (result?.ok) {
+        // UI sofort aktualisieren
+        s.hatFoto = true;
+        s.dbFotoUrl = dataUrlForUpload;
+
+        // Zuordnung entfernen, weil bereits hochgeladen
+        zuordnungen.value = zuordnungen.value.filter(z => z.sId !== s.id);
+
+        showToast(`Live-Foto für ${s.vorname} gespeichert.`, 'success');
+      } else {
+        // Zuordnung bleibt bestehen → später per "Zuordnungen hochladen" erneut versuchen
+        if (result?.code === 403) {
+          showToast("Live-Upload abgebrochen: Keine Rechte (403).", "danger");
+        } else if (result?.code === 404) {
+          showToast(`Live-Upload fehlgeschlagen: Schüler ${s.id} nicht gefunden (404).`, "danger");
+        } else {
+          showToast(`Live-Upload fehlgeschlagen: ${result?.message ?? "Unbekannter Fehler"}`, "danger");
+        }
+      }
+    } else {
+      // klassisches Verhalten ohne Direkt-Upload
+      if (idx !== -1) showToast(`Foto für ${s.vorname} aktualisiert`, 'info');
+      else showToast(`Foto für ${s.vorname} erstellt`, 'success');
+    }
+
+    stopCamera();
+  } catch (e) {
+    console.error("capturePhoto Fehler:", e);
+    showToast("Foto konnte nicht gespeichert werden.", "danger");
+  } finally {
+    // falls irgendwo vorher abgebrochen wurde
+    if (uploadStatus.active && uploadStatus.total === 1) {
+      uploadStatus.active = false;
+    }
+  }
+}
+
 
 // NEU: Einzelnes Bild auf Festplatte speichern
 function downloadSingleImage(fileName) {
@@ -676,15 +1018,6 @@ async function downloadAllLiveImages() {
 
 
 
-
-function leereBilderPool() {
-  if (confirm("Möchtest du wirklich den Pool leeren und alle aktuellen Zuordnungen löschen?")) {
-    gefundeneBilder.value = {};
-    zuordnungen.value = [];
-    showToast("Bilder-Pool wurde geleert", "info");
-  }
-}
-
 function zeigeLeerenModal() {
   deleteModal.show = true; // KEIN .value
   deleteModal.mode = 'pool';
@@ -701,13 +1034,22 @@ function entferneBildAusPool(dateiname) {
 }
 
 const confirmDelete = (s) => {
-  // Das alert kannst du jetzt entfernen, wenn du magst
-  deleteModal.show = true; // KEIN .value
+  // User hat keine Änderungsrechte
+  if (canEditSchueler.value !== true) {
+    showToast("Keine Berechtigung zum Löschen.", "danger");
+    return;
+  } 
+
+
+  //  Änderungsrechte vorhanden → normaler Löschdialog
+  deleteModal.show = true;
   deleteModal.mode = 'svws';
   deleteModal.schueler = s;
-  deleteModal.titel = 'Foto in Schild löschen';
-  deleteModal.nachricht = `Möchtest du das Foto von ${s.vorname} ${s.nachname} wirklich löschen?`;
+  deleteModal.titel = 'Foto in Schild löschen?';
+  deleteModal.nachricht =
+    `Möchtest du das Foto von ${s.vorname} ${s.nachname} in der Schülerdatenbank wirklich löschen?`;
 };
+
 
 import jw from './assets/jw.jpg';
 const spendeHTML = `
@@ -741,10 +1083,9 @@ const spendeHTML = `
 `;
 
 function zeigeInfoModal() {
-  deleteModal.titel = "Unterstütze das Projekt";
-  deleteModal.mode = "info"; // Wichtig für das v-if oben!
-  deleteModal.nachricht = spendeHTML; // Hier kommt dein langer String mit der Karte rein
-  deleteModal.show = true;
+  infoModal.titel = "Unterstütze das Projekt";
+  infoModal.html = spendeHTML;
+  infoModal.show = true;
 }
 
 
