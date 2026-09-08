@@ -1,4 +1,5 @@
 import express from 'express';
+import { getPermissionResult } from './permissions.js';
 import axios from 'axios';
 import fs from 'node:fs';
 import https from 'node:https';
@@ -96,43 +97,6 @@ function buildResponseSnippet(data) {
   } catch {
     return '';
   }
-}
-
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === 'object') return Object.values(value);
-  return [];
-}
-
-function toKompetenzModulo100(kompetenz) {
-  let raw = null;
-
-  if (typeof kompetenz === 'number' || typeof kompetenz === 'string') raw = kompetenz;
-  else if (typeof kompetenz === 'object' && kompetenz !== null) raw = kompetenz.id ?? kompetenz.nr ?? null;
-
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return null;
-  return ((value % 100) + 100) % 100;
-}
-
-function collectKompetenzen(endpointData) {
-  const gruppenKompetenzen = asArray(endpointData?.gruppen).flatMap((gruppe) => asArray(gruppe?.kompetenzen));
-  const direkteKompetenzen = asArray(endpointData?.kompetenzen);
-  return [...gruppenKompetenzen, ...direkteKompetenzen];
-}
-
-function getPermissionResult(endpointData) {
-  const kompetenzwerte = collectKompetenzen(endpointData)
-    .map((kompetenz) => toKompetenzModulo100(kompetenz))
-    .filter((value) => value != null);
-
-  const canViewSchueler = kompetenzwerte.includes(11);
-  if (!canViewSchueler) return { canViewSchueler: false, canEditSchueler: false };
-
-  return {
-    canViewSchueler: true,
-    canEditSchueler: kompetenzwerte.includes(12),
-  };
 }
 
 function formatAxiosError(err) {
