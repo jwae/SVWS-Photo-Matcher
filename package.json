@@ -1,6 +1,6 @@
 {
-  "name": "svws-client02",
-  "version": "1.0.0",
+  "name": "SVWS Foto-Matcher",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "engines": {
