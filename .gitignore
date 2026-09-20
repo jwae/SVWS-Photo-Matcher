@@ -44,3 +44,9 @@ __screenshots__/
 
 # Electron builds
 release/
+
+# Gemeinsame Projektdokumentation versionieren
+!/README.md
+!/AGENTS.md
+!/Version.md
+!/lib/README.md

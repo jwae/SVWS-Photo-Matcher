@@ -1,9 +1,9 @@
 SVWS Foto-Matcher - Windows-Desktop
 
-Fertige Dateien (Windows x64)
-  release/SVWS-Foto-Matcher-1.0.1-Setup.exe
+Ausgabedateien nach npm run desktop:dist (Windows x64)
+  release/SVWS-Foto-Matcher-<Version>-Setup.exe
     Installationsassistent mit Wahl des Zielverzeichnisses.
-  release/SVWS-Foto-Matcher-1.0.1-Portable.exe
+  release/SVWS-Foto-Matcher-<Version>-Portable.exe
     Start ohne Installation. Benutzer-Einstellungen liegen auch hier im
     Windows-Benutzerprofil, nicht neben der EXE.
 
@@ -41,3 +41,8 @@ Automatischer Starttest
   Ergebnis und Bildschirmaufnahme: %TEMP%/svws-photo-matcher-smoke/
   Ein echter SVWS-Login, Fotowrites und eine reale Kameraaufnahme werden dabei
   nicht ausgefuehrt.
+
+Gemeinsames Projekt
+  Web und Desktop verwenden src/, backend/ und lib/ gemeinsam.
+  <Version> entspricht der Version in package.json.
+  Die zentrale Start- und Pflegeanleitung steht in README.md.

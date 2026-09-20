@@ -1350,6 +1350,8 @@ tr:hover .circle-empty {
 }
 
 .panel-dropdown-menu {
+  box-sizing: border-box;
+  overflow: hidden;
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -1363,36 +1365,49 @@ tr:hover .circle-empty {
   backdrop-filter: blur(10px);
 }
 
-.panel-dropdown-scroll {
-  --dropdown-item-height: 36px;
-  max-height: calc(10 * var(--dropdown-item-height));
+.panel-dropdown-list {
+  /* Zehn Einträge à 36px; der Rahmen behält seinen Innenabstand. */
+  max-height: calc(10 * 36px);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.panel-dropdown-scroll::-webkit-scrollbar {
-  width: 6px;
+.panel-dropdown-list::-webkit-scrollbar {
+  width: 10px;
 }
 
-.panel-dropdown-scroll::-webkit-scrollbar-track {
+.panel-dropdown-list::-webkit-scrollbar-track {
+  margin-block: 4px;
+  border-radius: 999px;
   background: var(--color-primary-soft);
-  border-radius: 999px;
 }
 
-.panel-dropdown-scroll::-webkit-scrollbar-thumb {
+.panel-dropdown-list::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid var(--color-primary-soft);
+  border-radius: 999px;
   background: var(--color-primary);
-  border-radius: 999px;
 }
 
-.panel-dropdown-scroll::-webkit-scrollbar-thumb:hover {
+.panel-dropdown-list::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary-dark);
+}
+
+.panel-dropdown-list::-webkit-scrollbar-button {
+  display: none;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .panel-dropdown-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--color-primary-soft);
+  }
 }
 
 .panel-dropdown-item {
   display: block;
   width: 100%;
-  height: var(--dropdown-item-height);
-  white-space: nowrap;
+  min-height: 36px;
   border: 0;
   border-radius: 12px;
   background: transparent;

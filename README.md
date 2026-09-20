@@ -1,31 +1,62 @@
 # SVWS Foto-Matcher
 
-Der SVWS Foto-Matcher ist eine Webapp zum Zuordnen, Prüfen und Hochladen von Schuelerfotos in SVWS/Schild.
-Die App laedt Klassen- und Schuelerdaten aus SVWS, zeigt vorhandene Fotos an, unterstuetzt das manuelle oder automatische Matching mit lokalen Bildern und uebertraegt die fertigen Zuordnungen anschliessend ueber das lokale Backend an den SVWS-Server.
+Ein gemeinsames Projekt fuer Web und Electron zum Zuordnen und Hochladen von Schuelerfotos nach SVWS/Schild. Beide Varianten verwenden dieselbe Vue-Oberflaeche, Fachlogik und dasselbe Express-Backend.
 
-## Entwicklung starten
-npm install
-npm run serve
-oder
-npm run dev
+## Voraussetzungen
 
-## Build erstellen
-npm run build
+- Node.js gemaess `engines` in `package.json`: ^20.19.0 oder >=22.12.0.
+- Abhaengigkeiten installieren: `npm ci`.
+- Fuer echte Schuelerdaten ist ein erreichbarer SVWS-Server erforderlich.
 
-## Gebaute App lokal starten
-npm run preview
+## Start und Build
 
-## Architektur
-- `src/`: Vue-Frontend
-- `backend/`: Express-Backend als SVWS-Fassade/Proxy
-- `lib/`: gemeinsames fachliches Hilfsmodul `loadKlassenUndSchueler.js`
+| Zweck | Befehl |
+| --- | --- |
+| Webentwicklung mit Vite und Backend | `npm run dev` (alternativ `npm run serve`) |
+| Gemeinsame Oberflaeche bauen | `npm run build` |
+| Gebaute Webversion lokal starten | `npm start` (alternativ `npm run preview`) |
+| Oberflaeche bauen und Electron starten | `npm run desktop` |
+| Entpackte Windows-App erstellen | `npm run desktop:pack` |
+| Windows-Installer und portable EXE erstellen | `npm run desktop:dist` |
+| Automatische Tests | `npm test` |
 
-## API-Endpunkte
-- GET /config/db/schemata
-- GET /db/{schema}/schule/stammdaten
-- GET /db/{schema}/schueler/abschnitt/{idSchuljahresabschnitt}/auswahlliste
-- PATCH /db/{schema}/schueler/{id}/stammdaten
+Die lokale Webversion ist unter `http://127.0.0.1:3100` erreichbar. In der Entwicklung zeigt Vite seine eigene Adresse im Terminal an und leitet `/api` an das Backend auf Port 3100 weiter. `PORT` aendert den Backend-Port; der Vite-Proxy muss bei abweichendem Entwicklungsport passend konfiguriert werden.
 
-## Hinweise
-- Im Dev-Modus laeuft das Frontend ueber Vite und das Backend auf `http://127.0.0.1:3100`.
-- Das Frontend spricht nur mit lokalen `/api/svws/...`-Routen; der Zugriff auf SVWS erfolgt serverseitig im Backend.
+Electron startet das Backend automatisch auf einem freien lokalen Port und beendet es mit der App. Ein separat gestarteter Webserver ist dafuer nicht erforderlich. Auf Windows-Zielrechnern benoetigt die gebaute Desktop-App keine separate Node.js-Installation.
+
+## Gemeinsame Architektur
+
+- `src/`: gemeinsame Vue-Oberflaeche und fachliche Module fuer beide Varianten.
+- `backend/`: Express-Backend fuer SVWS-Zugriffe und Berechtigungspruefung.
+- `lib/`: gemeinsames Modul zum Laden und Normalisieren von Klassen und Schuelern.
+- `desktop/src/main.js`: Electron-Fenster, App-Protokoll, Backend-Lebenszyklus und Desktop-Sicherheitsregeln.
+- `dist/`: erzeugter Web-Build, der auch in die Desktop-App eingebunden wird.
+- `release/`: erzeugte Windows-Anwendungen.
+
+Das Frontend verwendet lokale `/api/svws/...`-Routen. Im Desktopbetrieb vermittelt `sfm://app` zum internen Backend. Node-Zugriff im Renderer ist deaktiviert; Sandbox und Context-Isolation sind aktiv. Eine Preload-Bridge ist aktuell nicht vorhanden.
+
+## Version und Pflege
+
+Die gemeinsame Versionsnummer steht in `package.json` und `package-lock.json`. Die Kurzanleitung liest sie aus `package.json`, das Electron-Fenster aus `app.getVersion()`. Versionswechsel deshalb zentral mit `npm version <Version> --no-git-tag-version` vornehmen und beide Varianten neu bauen.
+
+Gemeinsame Aenderungen werden einmal in `src/`, `backend/` oder `lib/` gepflegt. Nur Desktop-spezifische Funktionen gehoeren nach `desktop/`. Fuer die Zusammenfuehrung bleibt die Version zunaechst 1.0.2; ein neuer Release-Tag wird erst nach Freigabe angelegt. Bereits veroeffentlichte Tags bleiben unveraendert.
+
+Projektanleitungen werden mit Git versioniert. `node_modules/`, `dist/` und `release/` sind erzeugte Dateien und bleiben ausgeschlossen. Die bisherigen separaten Projektordner bleiben bis zur Abnahme erhalten.
+
+## Pruefung vor einem Release
+
+1. `npm test` und `npm run build` ausfuehren.
+2. Webversion mit `npm start` und Desktopversion mit `npm run desktop` pruefen.
+3. Klassen-Dropdown, Kurzanleitung, Login, Kamera und Fotoablauf in beiden Varianten kontrollieren; Schreibtests nur mit geeigneten Testdaten.
+4. Bei Desktop-Releases die Windows-Pakete bauen und pruefen.
+
+Details zum Desktopbetrieb und zum automatischen Starttest stehen in `desktop/README.txt`. Funktionsfehler aus der vorherigen Codepruefung sind separate Aufgaben und werden durch die Zusammenfuehrung nicht automatisch behoben.
+
+## Verwendete SVWS-Endpunkte
+
+- `GET /config/db/schemata`
+- `GET /db/{schema}/benutzer/angemeldet/daten`
+- `GET /db/{schema}/schule/stammdaten`
+- `GET /db/{schema}/schueler/abschnitt/{idSchuljahresabschnitt}/auswahlliste`
+- `GET /db/{schema}/schueler/{id}/stammdaten`
+- `PATCH /db/{schema}/schueler/{id}/stammdaten`

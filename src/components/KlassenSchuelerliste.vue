@@ -72,7 +72,7 @@ onBeforeUnmount(() => {
             </button>
 
             <div v-if="isDropdownOpen" class="panel-dropdown-menu">
-              <div class="panel-dropdown-scroll">
+              <div class="panel-dropdown-list">
                 <button
                   v-for="klasse in klassenListe"
                   :key="klasse.id"
