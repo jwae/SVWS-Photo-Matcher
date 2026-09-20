@@ -4,15 +4,22 @@ import axios from 'axios';
 import fs from 'node:fs';
 import https from 'node:https';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadKlassenUndSchueler } from '../lib/loadKlassenUndSchueler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const distDir = path.join(projectRoot, 'dist');
-const port = Number(process.env.PORT || 3100);
+export function createBackend({ accessToken, createHttpsAgent } = {}) {
 const app = express();
+
+if (accessToken) {
+  app.use((req, res, next) => {
+    if (req.headers['x-sfm-desktop-token'] !== accessToken) return res.sendStatus(403);
+    next();
+  });
+}
 
 app.use(express.json({ limit: '15mb' }));
 
@@ -59,7 +66,7 @@ function createSvwsClient({ serverBase, dbName = '', credentials, allowTestIp = 
     timeout,
     auth: credentials,
     headers,
-    httpsAgent: buildHttpsAgent(normalizedBase, allowTestIp),
+    httpsAgent: (createHttpsAgent ?? buildHttpsAgent)(normalizedBase, allowTestIp),
   });
 }
 
@@ -313,6 +320,21 @@ if (fs.existsSync(distDir)) {
   });
 }
 
-app.listen(port, () => {
-  console.log(`SVWS backend listening on http://127.0.0.1:${port}`);
-});
+return app;
+}
+
+export function startBackend({ port = 0, ...options } = {}) {
+  return new Promise((resolve, reject) => {
+    const server = createBackend(options).listen(port, '127.0.0.1', () => resolve(server));
+    server.once('error', reject);
+  });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  startBackend({ port: Number(process.env.PORT || 3100) }).then((server) => {
+    console.log(`SVWS backend listening on http://127.0.0.1:${server.address().port}`);
+  }).catch((error) => {
+    console.error('Backend konnte nicht gestartet werden:', error.message);
+    process.exitCode = 1;
+  });
+}

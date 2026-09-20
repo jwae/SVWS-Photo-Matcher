@@ -1,14 +1,18 @@
 import { fileURLToPath, URL } from 'node:url'
+import { realpathSync } from 'node:fs'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+// Use the same physical Windows path for the root and resolved HTML entry.
+const projectRoot = realpathSync.native(fileURLToPath(new URL('.', import.meta.url)))
 
 export default defineConfig({
+  root: projectRoot,
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': path.join(projectRoot, 'src'),
     },
   },
   server: {

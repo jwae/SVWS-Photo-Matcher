@@ -131,7 +131,7 @@ export function buildHelpHtml() {
       </div>
       <div class="help-step">
         <i class="bi bi-camera-fill help-step-icon"></i>
-        <div><strong>Kamera:</strong> Über das <strong>Kamera-Symbol</strong> kann ein Live-Foto aufgenommen werden, welches anschließend automatisch in Schild hochgeladen wird.</div>
+        <div><strong>Kamera:</strong> Über das <strong>Kamera-Symbol</strong> kann ein Live-Foto aufgenommen werden, welches anschließend automatisch in Schild hochgeladen wird. Auch ein verbundenes <strong>Smartphone</strong> kann dafür genutzt werden, wenn es am Computer als Kamera eingerichtet ist.</div>
       </div>
       <div class="help-step">
         <i class="bi bi-cloud-upload-fill help-step-icon help-step-icon-success"></i>
@@ -140,7 +140,6 @@ export function buildHelpHtml() {
     </div>
     <div class="help-tip">
       Tipp: Ein Klick auf einen bereits verknüpften Eintrag hebt die Zuordnung wieder auf.
-    </div>	
-    
+    </div>
   `;
 }

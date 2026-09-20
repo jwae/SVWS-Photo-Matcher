@@ -1093,6 +1093,10 @@ tr:hover .circle-empty {
 }
 
 .help-copyright {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   text-align: center;
 }

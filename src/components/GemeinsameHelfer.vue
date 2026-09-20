@@ -1,4 +1,6 @@
 <script setup>
+import { version as appVersion } from '../../package.json'
+
 defineProps({
   isDemo: { type: Boolean, required: true },
   toast: { type: Object, required: true },
