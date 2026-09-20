@@ -1,6 +1,6 @@
 {
-  "name": "SVWS Foto-Matcher",
-  "version": "1.0.1",
+  "name": "svws-photo-matcher",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,7 +14,10 @@
     "dev:backend": "node --watch backend/server.js",
     "start": "node backend/server.js",
     "build": "vite build",
-    "preview": "node backend/server.js"
+    "preview": "node backend/server.js",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win --x64 --dir",
+    "desktop:dist": "npm run build && electron-builder --win --x64 --publish never"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
@@ -27,7 +30,43 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
     "concurrently": "^9.2.1",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
     "vite": "^7.3.0",
     "vite-plugin-vue-devtools": "^8.0.5"
+  },
+  "productName": "SVWS Foto-Matcher",
+  "description": "Schuelerfotos SVWS zuordnen und hochladen",
+  "main": "desktop/src/main.js",
+  "build": {
+    "appId": "de.jwae.svws-photo-matcher",
+    "productName": "SVWS Foto-Matcher",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "backend/**/*.js",
+      "!backend/**/*.test.js",
+      "lib/**/*.js",
+      "desktop/src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "SVWS-Foto-Matcher-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "SVWS-Foto-Matcher-${version}-Portable.${ext}"
+    }
   }
 }

@@ -72,16 +72,18 @@ onBeforeUnmount(() => {
             </button>
 
             <div v-if="isDropdownOpen" class="panel-dropdown-menu">
-              <button
-                v-for="klasse in klassenListe"
-                :key="klasse.id"
-                type="button"
-                class="panel-dropdown-item"
-                :class="{ 'panel-dropdown-item-active': String(selectedKlasse?.id ?? '') === String(klasse.id) }"
-                @click.stop="selectKlasse(klasse)"
-              >
-                {{ klasse.kuerzel }}
-              </button>
+              <div class="panel-dropdown-scroll">
+                <button
+                  v-for="klasse in klassenListe"
+                  :key="klasse.id"
+                  type="button"
+                  class="panel-dropdown-item"
+                  :class="{ 'panel-dropdown-item-active': String(selectedKlasse?.id ?? '') === String(klasse.id) }"
+                  @click.stop="selectKlasse(klasse)"
+                >
+                  {{ klasse.kuerzel }}
+                </button>
+              </div>
             </div>
           </div>
         </div>

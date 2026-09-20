@@ -1,4 +1,6 @@
 <script setup>
+import { version as appVersion } from '../../package.json'
+
 defineProps({
   isDemo: { type: Boolean, required: true },
   toast: { type: Object, required: true },
@@ -107,6 +109,7 @@ const emit = defineEmits(['closeDeleteModal', 'executeDelete', 'closePreview', '
 
       <div class="dialog-body dialog-body-help">
         <div class="help-content" v-html="helpModal.html"></div>
+        <footer class="help-copyright">App-Version: {{ appVersion }} · © 2026 J. Waedt</footer>
       </div>
     </div>
   </div>

@@ -41,3 +41,6 @@ __screenshots__/
 # Umgebungsvariablen (HIER stehen oft Passwörter oder API-Keys)
 .env
 .env.local
+
+# Electron builds
+release/
