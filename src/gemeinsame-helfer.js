@@ -141,6 +141,6 @@ export function buildHelpHtml() {
     <div class="help-tip">
       Tipp: Ein Klick auf einen bereits verknüpften Eintrag hebt die Zuordnung wieder auf.
     </div>	
-    <footer class="help-copyright">© 2026 J. Waedt</footer>
+    
   `;
 }
