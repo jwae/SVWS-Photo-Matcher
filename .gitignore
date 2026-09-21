@@ -50,3 +50,4 @@ release/
 !/AGENTS.md
 !/Version.md
 !/lib/README.md
+!/deployment/debian-lxc/README.md

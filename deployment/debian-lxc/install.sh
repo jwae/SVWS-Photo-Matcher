@@ -17,6 +17,8 @@ if [[ ${1:-} == --help && $# == 1 ]]; then
     printf '%s\n' \
         'Aufruf: bash install.sh' \
         'Nur Erstinstallation als root auf frischem Debian 12 mit systemd.' \
+        'Im vollstaendigen Git-Clone starten: deployment/debian-lxc/install.sh.' \
+        'Installiert den lokalen Commit ohne zweiten GitHub-Zugriff.' \
         'IPv4 wird ermittelt; bei mehreren Adressen erfolgt eine Auswahl.' \
         'Die lokale CA erfordert eine interaktive Passworteingabe.' \
         'Keine automatische Zertifikatserneuerung, kein Update-Modus.'
@@ -30,11 +32,36 @@ fi
 source /etc/os-release
 [[ ${ID:-} == debian && ${VERSION_ID:-} == 12 ]] || die 'Dieses Skript unterstuetzt ausschliesslich Debian 12.'
 [[ -d /run/systemd/system ]] || die 'Ein laufendes systemd wird benoetigt.'
-for command in ip ss systemctl runuser apt-get; do
+for command in ip ss systemctl runuser apt-get git tar; do
     command -v "$command" >/dev/null || die "Werkzeug fehlt: $command (ip und ss kommen aus iproute2)."
 done
 
-info 'Frische Installation pruefen'
+info '1/7 - Git-Quelle und frische Installation pruefen'
+printf '%s\n' \
+    'Dieses Skript richtet die Foto-App, HTTPS und den automatischen Dienststart ein.' \
+    'Die GitHub-Anmeldung und das Klonen muessen bereits abgeschlossen sein.' \
+    'Es verwendet den lokalen Git-Stand; der Dienstbenutzer braucht keine GitHub-Anmeldung.' \
+    'Spaeter werden ggf. die IP-Auswahl und ein neues Passwort fuer die lokale CA abgefragt.' \
+    'Bei einem Fehler stoppt die Installation. Bereits ausgefuehrte Schritte bleiben erhalten.'
+
+# Quelle relativ zum Skript ermitteln, unabhaengig vom aktuellen Arbeitsverzeichnis.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+SOURCE_DIR=$(cd -- "$SCRIPT_DIR/../.." && pwd -P)
+[[ $(git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree 2>/dev/null) == true && \
+    $(git -C "$SOURCE_DIR" rev-parse --show-prefix) == '' ]] || \
+    die 'Bitte das Skript aus deployment/debian-lxc eines vollstaendigen Git-Clones starten.'
+SOURCE_COMMIT=$(git -C "$SOURCE_DIR" rev-parse --verify 'HEAD^{commit}')
+SOURCE_BRANCH=$(git -C "$SOURCE_DIR" symbolic-ref --quiet --short HEAD || printf 'detached HEAD')
+git -C "$SOURCE_DIR" diff --quiet HEAD -- || \
+    die 'Die Git-Quelle enthaelt lokale Aenderungen. Zuerst committen oder einen frischen Clone verwenden.'
+for required in package.json package-lock.json backend/server.js deployment/debian-lxc/install.sh; do
+    git -C "$SOURCE_DIR" cat-file -e "$SOURCE_COMMIT:$required" 2>/dev/null || \
+        die "Datei fehlt im Git-Commit: $required. Zuerst die vollstaendige Version committen und pushen."
+done
+readonly SCRIPT_DIR SOURCE_DIR SOURCE_COMMIT SOURCE_BRANCH
+printf 'Quelle: %s\nBranch: %s\nCommit: %s\n' "$SOURCE_DIR" "$SOURCE_BRANCH" "$SOURCE_COMMIT"
+printf '%s\n' 'Nur Dateien aus diesem Commit werden uebernommen; .git und lokale Zusatzdateien bleiben in der Quelle.'
+
 for target in "$APP_DIR" "$CONFIG_DIR" "$CA_DIR" "$UNIT" /etc/nginx; do
     [[ ! -e $target && ! -L $target ]] || die "Bereits vorhanden: $target. Bestehende Installation wird nicht ueberschrieben."
 done
@@ -45,7 +72,8 @@ if [[ -n $(ss -H -ltn '( sport = :80 or sport = :443 or sport = :3100 )') ]]; th
     die 'Port 80, 443 oder 3100 ist bereits belegt.'
 fi
 
-info 'Container-IP ermitteln'
+info '2/7 - Container-IP ermitteln'
+printf '%s\n' 'Die ausgewaehlte IPv4-Adresse wird fuer HTTPS und das Serverzertifikat verwendet.'
 mapfile -t addresses < <(ip -4 -o address show scope global up | awk '{split($4,a,"/"); print a[1]}' | sort -u)
 (( ${#addresses[@]} > 0 )) || die 'Keine aktive IPv4-Adresse gefunden. Zuerst Netzwerk konfigurieren.'
 if (( ${#addresses[@]} == 1 )); then
@@ -67,7 +95,10 @@ fi
 readonly APP_IP
 printf 'Verwendete Adresse: https://%s\nDie IP muss dauerhaft gleich bleiben (feste IP oder DHCP-Reservierung).\n' "$APP_IP"
 
-info 'Systempakete und Node.js 24 installieren'
+info '3/7 - Systempakete und Node.js 24 installieren'
+printf '%s\n' \
+    'Jetzt werden Pakete aus Debian und NodeSource heruntergeladen.' \
+    'Dieser Schritt benoetigt Internetzugang und kann einige Minuten dauern.'
 apt-get update
 apt-get install -y ca-certificates curl git openssl gnupg
 # Offizielles NodeSource-Setup fuegt das Node.js-24-Paketrepository hinzu.
@@ -82,18 +113,29 @@ apt-get install -y nodejs nginx
 node --version
 npm --version
 
-info 'Standardbranch klonen, testen und bauen'
+info '4/7 - Lokale Git-Quelle uebernehmen, testen und bauen'
+printf 'Ziel: %s\n' "$APP_DIR"
+printf '%s\n' \
+    'Die Dateien des ausgewaehlten Commits werden lokal an den Dienstbenutzer sfm uebergeben.' \
+    'Es erfolgt kein weiterer GitHub-Clone; GitHub-Zugangsdaten werden nicht uebertragen.'
 adduser --system --group --home "$APP_DIR" --shell /usr/sbin/nologin sfm
-runuser -u sfm -- git clone --single-branch "$REPO" "$APP_DIR"
+git -C "$SOURCE_DIR" archive --format=tar "$SOURCE_COMMIT" | runuser -u sfm -- tar -x -C "$APP_DIR"
 (
     cd "$APP_DIR"
+    printf '\nAbhaengigkeiten von npm herunterladen (kann einige Minuten dauern).\n'
     runuser -u sfm -- env NODE_ENV=development ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --include=dev
+    printf '\nAutomatische Tests ausfuehren; bei Fehlern wird nicht weiter installiert.\n'
     runuser -u sfm -- npm test
+    printf '\nWeboberflaeche fuer den Betrieb bauen.\n'
     runuser -u sfm -- npm run build
 )
 [[ -s $APP_DIR/dist/index.html ]] || die 'Der Web-Build fehlt.'
 
-info 'Lokale CA und Serverzertifikat erstellen'
+info '5/7 - Lokale CA und Serverzertifikat erstellen'
+printf '%s\n' \
+    'Die eigene CA bestaetigt das HTTPS-Zertifikat fuer diese Container-IP.' \
+    'CA: 3650 Tage gueltig. Serverzertifikat: 365 Tage gueltig, manuell zu erneuern.' \
+    'Das oeffentliche CA-Zertifikat muss anschliessend auf jedem Client importiert werden.'
 install -d -m 0755 "$CONFIG_DIR" "$CONFIG_DIR/client"
 install -d -m 0700 "$CONFIG_DIR/tls" "$CA_DIR"
 printf '%s\n' "$APP_IP" > "$CONFIG_DIR/ip-address"
@@ -130,7 +172,10 @@ install -m 0644 "$CA_DIR/ca.crt" "$CONFIG_DIR/client/foto-app-ca.crt"
 openssl verify -CAfile "$CONFIG_DIR/client/foto-app-ca.crt" \
     -purpose sslserver -verify_ip "$APP_IP" "$CONFIG_DIR/tls/server.crt"
 
-info 'systemd und Nginx konfigurieren'
+info '6/7 - Autostart und HTTPS einrichten'
+printf '%s\n' \
+    'Die App startet als sfm auf 127.0.0.1:3100. Nginx stellt den HTTPS-Zugriff bereit.' \
+    'Nginx wird nach der Konfigurationspruefung neu gestartet, damit alte Port-Bindungen frei werden.'
 cat > "$UNIT" <<'EOF'
 [Unit]
 Description=SVWS Foto-Matcher
@@ -195,7 +240,8 @@ systemctl enable nginx
 # Ein Reload kann hier mit "Address already in use" scheitern.
 systemctl restart nginx
 
-info 'Erreichbarkeit und Zertifikat pruefen'
+info '7/7 - Erreichbarkeit und Zertifikat pruefen'
+printf '%s\n' 'Zuerst wird das lokale Backend getestet, danach HTTPS mit vollstaendiger Zertifikatspruefung.'
 curl --noproxy '*' --fail --silent --show-error --retry 10 --retry-connrefused \
     --retry-delay 1 --connect-timeout 3 --max-time 10 \
     http://127.0.0.1:3100/ -o /dev/null
@@ -204,8 +250,7 @@ curl --noproxy '*' --fail --silent --show-error --connect-timeout 3 --max-time 1
 systemctl is-active --quiet svws-foto-matcher nginx
 {
     printf 'Installiert (UTC): %s\nRepository: %s\n' "$(date -u +%FT%TZ)" "$REPO"
-    printf 'Branch: %s\n' "$(runuser -u sfm -- git -C "$APP_DIR" branch --show-current)"
-    printf 'Commit: %s\n' "$(runuser -u sfm -- git -C "$APP_DIR" rev-parse HEAD)"
+    printf 'Quelle: %s\nBranch: %s\nCommit: %s\n' "$SOURCE_DIR" "$SOURCE_BRANCH" "$SOURCE_COMMIT"
     printf 'Adresse: https://%s\n' "$APP_IP"
 } > "$CONFIG_DIR/installation.txt"
 
@@ -219,6 +264,8 @@ printf '\nCA-Zertifikat:\n'
 openssl x509 -in "$CA_DIR/ca.crt" -noout -dates
 printf '\n%s\n' \
     'CA-Zertifikat auf den Clients importieren; private Schluessel nicht verteilen.' \
+    'Unter Windows: Lokaler Computer -> Vertrauenswuerdige Stammzertifizierungsstellen.' \
+    'Danach den Browser neu starten und die oben angezeigte HTTPS-Adresse oeffnen.' \
     'CA-Verzeichnis samt Passwort separat sichern, siehe README.' \
     'Keine automatische Erneuerung eingerichtet. Vor Ablauf manuell erneuern.' \
     'Firewall bei Bedarf fuer TCP 80/443 aus dem internen Netz freigeben.' \
