@@ -189,8 +189,11 @@ ln -s /etc/nginx/sites-available/svws-foto-matcher /etc/nginx/sites-enabled/svws
 nginx -t
 systemctl daemon-reload
 systemctl enable --now svws-foto-matcher
-systemctl enable --now nginx
-systemctl reload nginx
+systemctl enable nginx
+# Debian startet Nginx bei der Paketinstallation mit Wildcard-Listenern.
+# Der Wechsel auf die konkrete Container-IP benoetigt freie alte Sockets:
+# Ein Reload kann hier mit "Address already in use" scheitern.
+systemctl restart nginx
 
 info 'Erreichbarkeit und Zertifikat pruefen'
 curl --noproxy '*' --fail --silent --show-error --retry 10 --retry-connrefused \
