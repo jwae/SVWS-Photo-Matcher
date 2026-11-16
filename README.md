@@ -60,3 +60,8 @@ Details zum Desktopbetrieb und zum automatischen Starttest stehen in `desktop/RE
 - `GET /db/{schema}/schueler/abschnitt/{idSchuljahresabschnitt}/auswahlliste`
 - `GET /db/{schema}/schueler/{id}/stammdaten`
 - `PATCH /db/{schema}/schueler/{id}/stammdaten`
+
+## Screenshots
+<img width="500" height="350" alt="fotomatcher01" src="https://github.com/user-attachments/assets/157f86c2-73c7-4635-b3e0-441c050b292e" />
+<img width="700" height="487" alt="fotomatcher02" src="https://github.com/user-attachments/assets/7a3c23b4-7482-4478-83c6-b53f649c3717" />
+
